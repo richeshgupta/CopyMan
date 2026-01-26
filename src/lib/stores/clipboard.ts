@@ -60,8 +60,10 @@ export async function clearAllHistory() {
   }
 }
 
-export function startClipboardListener() {
-  listen<ClipboardEntry>('clipboard-updated', (event) => {
+export async function startClipboardListener(): Promise<() => void> {
+  const unlisten = await listen<ClipboardEntry>('clipboard-updated', (event) => {
+    console.log('Received clipboard-updated event:', event.payload);
     clipboardHistory.update(history => [event.payload, ...history]);
   });
+  return unlisten;
 }

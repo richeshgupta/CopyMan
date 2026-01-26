@@ -1,23 +1,32 @@
 <script lang="ts">
-  import SearchBox from './lib/components/SearchBox.svelte';
-  import ClipboardList from './lib/components/ClipboardList.svelte';
-  import { loadHistory, clearAllHistory, startClipboardListener } from './lib/stores/clipboard';
-  import { listen } from '@tauri-apps/api/event';
-  import { onMount } from 'svelte';
+  import SearchBox from "./lib/components/SearchBox.svelte";
+  import ClipboardList from "./lib/components/ClipboardList.svelte";
+  import {
+    loadHistory,
+    clearAllHistory,
+    startClipboardListener,
+  } from "./lib/stores/clipboard";
+  import { listen } from "@tauri-apps/api/event";
+  import { onMount } from "svelte";
 
   onMount(() => {
-    loadHistory();
-    startClipboardListener();
+    let unlistenClipboard: (() => void) | undefined;
+    let unlistenClear: (() => void) | undefined;
 
-    // Listen for clear history hotkey
-    const unlisten = listen('clear-history-request', async () => {
-      if (confirm('Clear all clipboard history?')) {
-        await clearAllHistory();
-      }
-    });
+    (async () => {
+      await loadHistory();
+      unlistenClipboard = await startClipboardListener();
+
+      unlistenClear = await listen("clear-history-request", async () => {
+        if (confirm("Clear all clipboard history?")) {
+          await clearAllHistory();
+        }
+      });
+    })();
 
     return () => {
-      unlisten.then(fn => fn());
+      unlistenClipboard?.();
+      unlistenClear?.();
     };
   });
 </script>
@@ -35,7 +44,8 @@
   :global(body) {
     margin: 0;
     padding: 0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      sans-serif;
   }
 
   .app {
