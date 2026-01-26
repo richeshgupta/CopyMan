@@ -33,6 +33,61 @@ pub fn run() {
             // Register global hotkeys
             hotkeys::register_hotkeys(&app.handle())?;
 
+            // Start clipboard monitor
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let mut last_content: Option<String> = None;
+
+                loop {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+                    let mut clipboard = match arboard::Clipboard::new() {
+                        Ok(cb) => cb,
+                        Err(_) => continue,
+                    };
+
+                    if let Ok(content) = clipboard.get_text() {
+                        let has_changed = match &last_content {
+                            None => true,
+                            Some(last) => last != &content,
+                        };
+
+                        if has_changed && !content.is_empty() {
+                            // Get app state and save to database
+                            if let Some(state) = app_handle.try_state::<Arc<Mutex<AppState>>>() {
+                                if let Ok(app_state) = state.lock() {
+                                    let preview = if content.len() <= 100 {
+                                        content.clone()
+                                    } else {
+                                        format!("{}...", &content[..100])
+                                    };
+
+                                    let entry = crate::db::operations::ClipboardEntry {
+                                        id: None,
+                                        content: content.clone(),
+                                        content_type: "text".to_string(),
+                                        timestamp: chrono::Utc::now().timestamp(),
+                                        preview,
+                                    };
+
+                                    if let Ok(id) = crate::db::operations::insert_entry(&app_state.db.conn, &entry) {
+                                        // Add to Trie for fast search
+                                        if let Ok(mut search) = app_state.search.lock() {
+                                            search.add_to_trie(id, &content);
+                                        }
+
+                                        // Emit event to frontend
+                                        let _ = app_handle.emit("clipboard-updated", entry);
+                                    }
+                                }
+                            }
+
+                            last_content = Some(content);
+                        }
+                    }
+                }
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
