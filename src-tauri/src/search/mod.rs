@@ -1,8 +1,12 @@
 pub mod trie_index;
+pub mod hybrid;
 
 #[cfg(test)]
 mod tests {
     use super::trie_index::TrieIndex;
+    use super::hybrid::HybridSearch;
+    use crate::db::connection::Database;
+    use crate::db::operations::{ClipboardEntry, insert_entry};
 
     #[test]
     fn test_trie_insert_and_search() {
@@ -41,6 +45,49 @@ mod tests {
         assert_eq!(results.len(), 0); // "first" should be evicted
 
         let results = trie.search_prefix("second");
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn test_hybrid_search_trie_first() {
+        let db = Database::new_in_memory().unwrap();
+        let mut search = HybridSearch::new(&db.conn, 100).unwrap();
+
+        // Insert entries
+        for i in 1..=3 {
+            let entry = ClipboardEntry {
+                id: None,
+                content: format!("hello world {}", i),
+                content_type: "text".to_string(),
+                timestamp: chrono::Utc::now().timestamp() + i,
+                preview: format!("hello world {}", i),
+            };
+            let id = insert_entry(&db.conn, &entry).unwrap();
+            search.add_to_trie(id, &entry.content);
+        }
+
+        // Search should use Trie first
+        let results = search.search(&db.conn, "hello").unwrap();
+        assert!(results.len() >= 3);
+    }
+
+    #[test]
+    fn test_hybrid_search_fts5_fallback() {
+        let db = Database::new_in_memory().unwrap();
+        let search = HybridSearch::new(&db.conn, 100).unwrap();
+
+        // Insert entry to DB but not Trie
+        let entry = ClipboardEntry {
+            id: None,
+            content: "unique search term".to_string(),
+            content_type: "text".to_string(),
+            timestamp: chrono::Utc::now().timestamp(),
+            preview: "unique search term".to_string(),
+        };
+        insert_entry(&db.conn, &entry).unwrap();
+
+        // Search should fallback to FTS5
+        let results = search.search(&db.conn, "unique").unwrap();
         assert_eq!(results.len(), 1);
     }
 }
