@@ -18,10 +18,18 @@
   $: items = $virtualizer.getVirtualItems();
   $: totalSize = $virtualizer.getTotalSize();
 
-  function handleClick(entry: ClipboardEntry) {
+  async function handleSelect(entry: ClipboardEntry) {
     if (entry.id) {
-      copyToClipboard(entry.id);
+      await copyToClipboard(entry.id);
+      // Hide window after selection - emit event to parent
+      const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+      const window = getCurrentWebviewWindow();
+      await window.hide();
     }
+  }
+
+  function handleClick(entry: ClipboardEntry) {
+    handleSelect(entry);
   }
 
   function handleKeydown(event: KeyboardEvent) {
@@ -37,8 +45,19 @@
       scrollToIndex(selectedIndex);
     } else if (event.key === 'Enter') {
       event.preventDefault();
-      if (entries[selectedIndex]?.id) {
-        copyToClipboard(entries[selectedIndex].id!);
+      if (entries[selectedIndex]) {
+        handleSelect(entries[selectedIndex]);
+      }
+    } else if (event.key >= '1' && event.key <= '9') {
+      event.preventDefault();
+      const index = parseInt(event.key) - 1;
+      if (index < entries.length) {
+        handleSelect(entries[index]);
+      }
+    } else if (event.key === '0') {
+      event.preventDefault();
+      if (entries.length >= 10) {
+        handleSelect(entries[9]);
       }
     }
   }
@@ -70,6 +89,9 @@
           on:click={() => handleClick(entry)}
           style="position: absolute; top: 0; left: 0; width: 100%; transform: translateY({item.start}px);"
         >
+          {#if item.index < 10}
+            <span class="number-badge">{item.index === 9 ? '0' : item.index + 1}</span>
+          {/if}
           <div class="preview">{entry.preview}</div>
           <div class="timestamp">{formatTimestamp(entry.timestamp)}</div>
         </button>
@@ -91,13 +113,8 @@
     color: #666;
   }
 
-  .list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
   .list-item {
+    position: relative;
     width: 100%;
     padding: 0.75rem 1rem;
     text-align: left;
@@ -125,5 +142,21 @@
     font-size: 0.75rem;
     color: #6b7280;
     margin-top: 0.25rem;
+  }
+
+  .number-badge {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: #3b82f6;
+    color: white;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
   }
 </style>

@@ -13,18 +13,44 @@
     "windows": [
       {
         "title": "CopyMan",
-        "width": 600,
-        "height": 500,
-        "resizable": true,
-        "center": true,
+        "width": 500,
+        "height": 450,
+        "resizable": false,
+        "center": false,
         "visible": false,
-        "decorations": true,
+        "decorations": false,
         "alwaysOnTop": true,
-        "skipTaskbar": false
+        "skipTaskbar": true,
+        "focus": true,
+        "devtools": true
       }
     ],
+    "trayIcon": {
+      "id": "main-tray",
+      "iconPath": "icons/icon.png",
+      "tooltip": "CopyMan - Clipboard Manager",
+      "menuOnLeftClick": false
+    },
     "security": {
-      "csp": null
+      "csp": null,
+      "capabilities": [
+        {
+          "identifier": "main-capability",
+          "description": "Capability for the main window",
+          "windows": ["main"],
+          "permissions": [
+            "core:default",
+            "core:event:allow-listen",
+            "core:event:allow-emit",
+            "core:window:allow-show",
+            "core:window:allow-hide",
+            "core:window:allow-close",
+            "core:window:allow-set-focus",
+            "core:webview:allow-webview-position",
+            "core:webview:allow-webview-size"
+          ]
+        }
+      ]
     }
   },
   "bundle": {

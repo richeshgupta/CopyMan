@@ -4,6 +4,8 @@ mod clipboard;
 mod commands;
 mod state;
 mod hotkeys;
+mod tray;
+mod settings;
 
 use state::AppState;
 use std::sync::{Arc, Mutex};
@@ -32,6 +34,9 @@ pub fn run() {
 
             // Register global hotkeys
             hotkeys::register_hotkeys(&app.handle())?;
+
+            // Create system tray
+            tray::create_tray(&app.handle())?;
 
             // Start clipboard monitor
             let app_handle = app.handle().clone();
@@ -96,6 +101,10 @@ pub fn run() {
             commands::clipboard::search_clipboard,
             commands::clipboard::copy_to_clipboard,
             commands::clipboard::clear_all_history,
+            commands::window::hide_window,
+            commands::window::position_window_near_cursor,
+            commands::settings::get_settings,
+            commands::settings::save_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
