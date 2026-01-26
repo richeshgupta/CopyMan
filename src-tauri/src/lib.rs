@@ -3,6 +3,7 @@ mod search;
 mod clipboard;
 mod commands;
 mod state;
+mod hotkeys;
 
 use state::AppState;
 use std::sync::{Arc, Mutex};
@@ -28,6 +29,9 @@ pub fn run() {
 
             let state = AppState::new(db_path)?;
             app.manage(Arc::new(Mutex::new(state)));
+
+            // Register global hotkeys
+            hotkeys::register_hotkeys(&app.handle())?;
 
             Ok(())
         })

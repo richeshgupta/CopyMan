@@ -1,5 +1,6 @@
 import { writable, derived } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
 export interface ClipboardEntry {
   id: number;
@@ -57,4 +58,10 @@ export async function clearAllHistory() {
   } catch (error) {
     console.error('Failed to clear history:', error);
   }
+}
+
+export function startClipboardListener() {
+  listen<ClipboardEntry>('clipboard-updated', (event) => {
+    clipboardHistory.update(history => [event.payload, ...history]);
+  });
 }

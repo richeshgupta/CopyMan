@@ -1,11 +1,24 @@
 <script lang="ts">
   import SearchBox from './lib/components/SearchBox.svelte';
   import ClipboardList from './lib/components/ClipboardList.svelte';
-  import { loadHistory } from './lib/stores/clipboard';
+  import { loadHistory, clearAllHistory, startClipboardListener } from './lib/stores/clipboard';
+  import { listen } from '@tauri-apps/api/event';
   import { onMount } from 'svelte';
 
   onMount(() => {
     loadHistory();
+    startClipboardListener();
+
+    // Listen for clear history hotkey
+    const unlisten = listen('clear-history-request', async () => {
+      if (confirm('Clear all clipboard history?')) {
+        await clearAllHistory();
+      }
+    });
+
+    return () => {
+      unlisten.then(fn => fn());
+    };
   });
 </script>
 
