@@ -55,16 +55,144 @@ sudo rpm -i copyman-0.1.0.x86_64.rpm
 
 ## Development
 
+### Prerequisites
+
+#### System Dependencies (Linux)
+
+Before building CopyMan on Linux, install the required system dependencies:
+
+**Ubuntu/Debian:**
 ```bash
-# Install dependencies
+sudo apt-get update
+sudo apt-get install -y \
+  libgtk-3-dev \
+  libwebkit2gtk-4.1-dev \
+  libayatana-appindicator3-dev \
+  librsvg2-dev \
+  patchelf \
+  libjavascriptcoregtk-4.1-dev \
+  libsoup-3.0-dev
+```
+
+**Fedora:**
+```bash
+sudo dnf install \
+  gtk3-devel \
+  webkit2gtk4.1-devel \
+  libappindicator-gtk3-devel \
+  librsvg2-devel \
+  patchelf \
+  openssl-devel
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S \
+  webkit2gtk-4.1 \
+  gtk3 \
+  libappindicator-gtk3 \
+  librsvg \
+  patchelf
+```
+
+#### Rust
+
+Install Rust if you haven't already:
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+```
+
+Verify installation:
+```bash
+rustc --version
+cargo --version
+```
+
+#### Node.js
+
+Install Node.js (v18 or later):
+```bash
+# Using nvm (recommended)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+nvm install 18
+nvm use 18
+
+# Or download from https://nodejs.org/
+```
+
+### Building from Source
+
+1. **Clone the repository:**
+```bash
+git clone https://github.com/yourusername/copyman.git
+cd copyman
+```
+
+2. **Install Node dependencies:**
+```bash
 npm install
+```
 
-# Run in development
+3. **Build the frontend:**
+```bash
+npm run build
+```
+
+4. **Run in development mode:**
+```bash
 npm run tauri dev
+```
 
-# Build for production
+This will:
+- Start the Vite development server
+- Compile the Rust backend
+- Launch the CopyMan window
+- Enable hot-reload for frontend changes
+
+5. **Build for production:**
+```bash
 npm run tauri build
 ```
+
+Production builds will be created in `src-tauri/target/release/bundle/`:
+- **Debian/Ubuntu:** `copyman_0.1.0_amd64.deb`
+- **AppImage:** `copyman_0.1.0_amd64.AppImage`
+- **RPM (if rpmbuild installed):** `copyman-0.1.0-1.x86_64.rpm`
+
+### Running Tests
+
+**Rust backend tests:**
+```bash
+cd src-tauri
+cargo test
+```
+
+**Frontend type checking:**
+```bash
+npm run check
+```
+
+### Development Tips
+
+- **Hot reload:** Frontend changes auto-reload in dev mode
+- **Rust changes:** Require app restart (Ctrl+C and `npm run tauri dev` again)
+- **Database location:** `~/.local/share/com.copyman.app/clipboard.db`
+- **Logs:** Check terminal output for debugging
+
+### Common Issues
+
+**Issue:** `cargo: command not found`
+- **Solution:** Ensure Rust is installed and `$HOME/.cargo/bin` is in your PATH
+
+**Issue:** `pkg-config: command not found`
+- **Solution:** Install build tools: `sudo apt-get install pkg-config build-essential`
+
+**Issue:** Window doesn't appear
+- **Solution:** Check if running on X11/Wayland, ensure display is set: `echo $DISPLAY`
+
+**Issue:** Global hotkeys not working
+- **Solution:** Hotkeys require X11. On Wayland, they may not work depending on compositor.
 
 ## Technical Details
 
