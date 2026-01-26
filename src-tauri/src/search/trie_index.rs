@@ -1,4 +1,4 @@
-use radix_trie::Trie;
+use radix_trie::{Trie, TrieCommon};
 use lru::LruCache;
 use std::num::NonZeroUsize;
 

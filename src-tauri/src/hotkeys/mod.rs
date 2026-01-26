@@ -1,5 +1,5 @@
-use tauri::{AppHandle, Manager};
-use tauri_plugin_global_shortcut::{Code, Modifiers, ShortcutState};
+use tauri::{AppHandle, Manager, Emitter};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Code, Modifiers, ShortcutState};
 
 pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
     let app_handle = app.clone();

@@ -37,7 +37,6 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "identifier": "com.copyman.app",
     "shortDescription": "Cross-platform clipboard manager",
     "longDescription": "Fast, lightweight clipboard manager with unlimited history and powerful search"
   }

@@ -21,10 +21,11 @@ pub fn search_clipboard(
 ) -> Result<Vec<ClipboardEntry>, String> {
     let app_state = state.lock().map_err(|e| e.to_string())?;
 
-    app_state.search
+    let search = app_state.search
         .lock()
-        .map_err(|e| e.to_string())?
-        .search(&app_state.db.conn, &query)
+        .map_err(|e| e.to_string())?;
+
+    search.search(&app_state.db.conn, &query)
         .map_err(|e| format!("Search failed: {}", e))
 }
 
