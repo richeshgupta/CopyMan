@@ -25,10 +25,7 @@ pub fn register_hotkeys_with_settings(app: &AppHandle, settings: &Settings) -> R
                         if is_visible {
                             let _ = window.hide();
                         } else {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                            // Position window near tray icon
-                            let _ = crate::tray::position_window_near_cursor(&window);
+                            let _ = crate::commands::window::show_and_focus_window(&window);
                         }
                     }
                 }

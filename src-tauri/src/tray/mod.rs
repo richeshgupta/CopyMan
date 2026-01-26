@@ -36,32 +36,7 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
                             if is_visible {
                                 let _ = window.hide();
                             } else {
-                                let _ = window.show();
-                                let _ = position_window_near_cursor(&window);
-
-                                // Immediately request focus
-                                let _ = window.set_focus();
-
-                                // On Linux, request attention from window manager
-                                #[cfg(target_os = "linux")]
-                                let _ = window.request_user_attention(Some(tauri::UserAttentionType::Informational));
-
-                                // Also try setting focus multiple times with delays to handle timing issues
-                                let window_clone = window.clone();
-                                std::thread::spawn(move || {
-                                    // Try at different intervals
-                                    std::thread::sleep(std::time::Duration::from_millis(10));
-                                    let _ = window_clone.set_focus();
-
-                                    std::thread::sleep(std::time::Duration::from_millis(40));
-                                    let _ = window_clone.set_focus();
-
-                                    // Emit event to trigger focus on search input
-                                    let _ = window_clone.emit("window-focused", ());
-
-                                    std::thread::sleep(std::time::Duration::from_millis(50));
-                                    let _ = window_clone.set_focus();
-                                });
+                                let _ = crate::commands::window::show_and_focus_window(&window);
                             }
                         }
                     }
@@ -108,32 +83,7 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
                             if is_visible {
                                 let _ = window.hide();
                             } else {
-                                let _ = window.show();
-                                let _ = position_window_near_cursor(&window);
-
-                                // Immediately request focus
-                                let _ = window.set_focus();
-
-                                // On Linux, request attention from window manager
-                                #[cfg(target_os = "linux")]
-                                let _ = window.request_user_attention(Some(tauri::UserAttentionType::Informational));
-
-                                // Also try setting focus multiple times with delays to handle timing issues
-                                let window_clone = window.clone();
-                                std::thread::spawn(move || {
-                                    // Try at different intervals
-                                    std::thread::sleep(std::time::Duration::from_millis(10));
-                                    let _ = window_clone.set_focus();
-
-                                    std::thread::sleep(std::time::Duration::from_millis(40));
-                                    let _ = window_clone.set_focus();
-
-                                    // Emit event to trigger focus on search input
-                                    let _ = window_clone.emit("window-focused", ());
-
-                                    std::thread::sleep(std::time::Duration::from_millis(50));
-                                    let _ = window_clone.set_focus();
-                                });
+                                let _ = crate::commands::window::show_and_focus_window(&window);
                             }
                         }
                     }
