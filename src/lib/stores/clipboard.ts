@@ -3,11 +3,13 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
 export interface ClipboardEntry {
-  id: number;
+  id: number | null;  // Changed to match Rust Option<i64>
   content: string;
   content_type: string;
   timestamp: number;
   preview: string;
+  is_pinned: boolean;
+  pin_order: number | null;
 }
 
 export const searchQuery = writable<string>('');
@@ -43,7 +45,12 @@ export async function searchClipboard(query: string) {
   }
 }
 
-export async function copyToClipboard(entryId: number) {
+export async function copyToClipboard(entryId: number | null) {
+  if (entryId === null) {
+    console.error('Cannot copy: entry ID is null');
+    return;
+  }
+
   try {
     await invoke('copy_to_clipboard', { entryId });
   } catch (error) {
@@ -66,4 +73,49 @@ export async function startClipboardListener(): Promise<() => void> {
     clipboardHistory.update(history => [event.payload, ...history]);
   });
   return unlisten;
+}
+
+export async function pinEntry(id: number | null): Promise<void> {
+  if (id === null) {
+    console.error('Cannot pin entry: ID is null');
+    return;
+  }
+
+  try {
+    await invoke('pin_clipboard_entry', { id });
+    await loadHistory();
+  } catch (error) {
+    console.error('Failed to pin entry:', error);
+  }
+}
+
+export async function unpinEntry(id: number | null): Promise<void> {
+  if (id === null) {
+    console.error('Cannot unpin entry: ID is null');
+    return;
+  }
+
+  try {
+    await invoke('unpin_clipboard_entry', { id });
+    await loadHistory();
+  } catch (error) {
+    console.error('Failed to unpin entry:', error);
+  }
+}
+
+export async function deleteEntry(id: number | null): Promise<void> {
+  if (id === null) {
+    console.error('Cannot delete entry: ID is null');
+    return;
+  }
+
+  console.log('Deleting entry with ID:', id);
+  try {
+    await invoke('delete_clipboard_entry', { id });
+    console.log('Delete successful, reloading history...');
+    await loadHistory();
+  } catch (error) {
+    console.error('Failed to delete entry:', error);
+    alert('Failed to delete entry: ' + error);
+  }
 }

@@ -7,6 +7,7 @@
     clearAllHistory,
     startClipboardListener,
   } from "./lib/stores/clipboard";
+  import { theme } from "./lib/stores/theme";
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
   import { invoke } from '@tauri-apps/api/core';
@@ -41,6 +42,7 @@
     let unlistenClear: (() => void) | undefined;
     let unlistenSettings: (() => void) | undefined;
     let unlistenFocus: (() => void) | undefined;
+    let unlistenIntentionalHide: (() => void) | undefined;
     let unlistenBlur: Promise<() => void> | undefined;
 
     // Track if we're showing a dialog to prevent blur from hiding
@@ -72,12 +74,24 @@
       });
       console.log('show-settings listener set up successfully');
 
+      // Listen for intentional hide (from hotkey or menu)
+      unlistenIntentionalHide = await listen('intentional-hide', () => {
+        console.log('🚫 INTENTIONAL-HIDE EVENT - Setting isHiding flag to TRUE');
+        isHiding = true;
+        // Reset after window is hidden
+        setTimeout(() => {
+          console.log('🔄 INTENTIONAL-HIDE: Resetting isHiding to false after 200ms');
+          isHiding = false;
+        }, 200);
+      });
+
       // Listen for window focus event to focus search input
       unlistenFocus = await listen('window-focused', () => {
-        console.log('Window focused event - focusing search input');
+        console.log('🎯 WINDOW-FOCUSED EVENT - Resetting isHiding and focusing search input');
 
         // Reset state when window is shown
         isHiding = false;
+        console.log('✅ isHiding reset to false');
 
         // Focus the search input using the component's method
         // Don't focus if settings is open
@@ -102,31 +116,33 @@
 
       // Add blur listener to hide window when clicking outside
       unlistenBlur = window.listen('tauri://blur', async () => {
-        console.log('Blur event received');
+        console.log('🔵 BLUR EVENT RECEIVED - isDialogOpen:', isDialogOpen, 'isHiding:', isHiding);
 
         // Don't hide if a dialog is open
         if (isDialogOpen) {
-          console.log('Dialog is open, not hiding window');
+          console.log('⚠️  Dialog is open, not hiding window');
           return;
         }
 
         // Don't hide if already hiding (prevent race condition)
         if (isHiding) {
-          console.log('Already hiding, skipping');
+          console.log('⚠️  Already hiding, skipping');
           return;
         }
 
         try {
           isHiding = true;
-          console.log('Hiding window and resetting settings');
+          console.log('🔻 BLUR HANDLER: Hiding window and resetting settings');
           // Always reset settings state and hide
           showSettings = false;
           await invoke('hide_window');
+          console.log('✅ BLUR HANDLER: Window hidden successfully');
         } catch (error) {
-          console.error('Error hiding window:', error);
+          console.error('❌ Error hiding window:', error);
         } finally {
           // Reset flag after a short delay
           setTimeout(() => {
+            console.log('🔄 BLUR HANDLER: Resetting isHiding flag');
             isHiding = false;
           }, 100);
         }
@@ -137,6 +153,7 @@
       unlistenClipboard?.();
       unlistenClear?.();
       unlistenSettings?.();
+      unlistenIntentionalHide?.();
       unlistenFocus?.();
       unlistenBlur?.then(fn => fn());
     };
@@ -146,13 +163,6 @@
 <svelte:window on:keydown={handleGlobalKeydown} />
 
 <main class="app">
-  <header class="header">
-    <h1 class="title">CopyMan</h1>
-    <button class="close-button" on:click={async () => await invoke('hide_window')}>
-      ×
-    </button>
-  </header>
-
   <SearchBox bind:this={searchBoxComponent} />
   <ClipboardList />
 
@@ -165,56 +175,24 @@
   :global(body) {
     margin: 0;
     padding: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-      sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
     background: transparent;
+    -webkit-font-smoothing: antialiased;
   }
 
   .app {
     height: 100vh;
     display: flex;
     flex-direction: column;
-    background: #f9fafb;
-    border: 1px solid #d1d5db;
-    border-radius: 0.5rem;
-    overflow: hidden;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-  }
-
-  .header {
-    padding: 1rem;
     background: white;
-    border-bottom: 1px solid #e5e7eb;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
   }
 
-  .title {
-    margin: 0;
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: #111827;
-  }
-
-  .close-button {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    color: #6b7280;
-    cursor: pointer;
-    padding: 0;
-    width: 2rem;
-    height: 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0.25rem;
-    transition: background-color 0.2s, color 0.2s;
-  }
-
-  .close-button:hover {
-    background: #f3f4f6;
-    color: #111827;
+  /* Dark mode */
+  :global(.dark) .app {
+    background: #1c1c1e;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
   }
 </style>

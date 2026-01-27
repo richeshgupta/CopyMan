@@ -387,6 +387,7 @@ dependencies = [
  "arboard",
  "chrono",
  "lru",
+ "once_cell",
  "radix_trie",
  "rusqlite",
  "serde",

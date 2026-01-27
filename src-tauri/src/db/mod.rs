@@ -31,6 +31,8 @@ mod tests {
             content_type: "text".to_string(),
             timestamp: chrono::Utc::now().timestamp(),
             preview: "Hello, World!".to_string(),
+            is_pinned: false,
+            pin_order: None,
         };
 
         let id = operations::insert_entry(&db.conn, &entry).unwrap();
@@ -49,6 +51,8 @@ mod tests {
                 content_type: "text".to_string(),
                 timestamp: chrono::Utc::now().timestamp() + i,
                 preview: format!("Content {}", i),
+                is_pinned: false,
+                pin_order: None,
             };
             operations::insert_entry(&db.conn, &entry).unwrap();
         }
@@ -68,6 +72,8 @@ mod tests {
             content_type: "text".to_string(),
             timestamp: chrono::Utc::now().timestamp(),
             preview: "The quick brown fox".to_string(),
+            is_pinned: false,
+            pin_order: None,
         };
         operations::insert_entry(&db.conn, &entry).unwrap();
 
@@ -86,6 +92,8 @@ mod tests {
             content_type: "text".to_string(),
             timestamp: chrono::Utc::now().timestamp(),
             preview: "Test".to_string(),
+            is_pinned: false,
+            pin_order: None,
         };
         operations::insert_entry(&db.conn, &entry).unwrap();
 

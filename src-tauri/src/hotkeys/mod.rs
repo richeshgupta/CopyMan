@@ -1,6 +1,22 @@
 use tauri::{AppHandle, Manager, Emitter};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use crate::settings::Settings;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static WINDOW_IS_VISIBLE: AtomicBool = AtomicBool::new(false);
+
+// Helper functions to manage window visibility state
+pub fn set_window_visible(visible: bool) {
+    println!("🔄 STATE CHANGE: Setting window_visible to {} (was: {})", visible, WINDOW_IS_VISIBLE.load(Ordering::Relaxed));
+    WINDOW_IS_VISIBLE.store(visible, Ordering::Relaxed);
+    println!("✅ STATE CONFIRMED: window_visible is now {}", WINDOW_IS_VISIBLE.load(Ordering::Relaxed));
+}
+
+pub fn is_window_visible() -> bool {
+    let state = WINDOW_IS_VISIBLE.load(Ordering::Relaxed);
+    println!("🔍 STATE CHECK: is_window_visible() = {}", state);
+    state
+}
 
 pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
     // Load settings and register with those hotkeys
@@ -21,12 +37,24 @@ pub fn register_hotkeys_with_settings(app: &AppHandle, settings: &Settings) -> R
         .on_shortcut(show_hide_key.as_str(), move |_app, _shortcut, event| {
             if event.state == ShortcutState::Pressed {
                 if let Some(window) = app_handle.get_webview_window("main") {
-                    if let Ok(is_visible) = window.is_visible() {
-                        if is_visible {
-                            let _ = window.hide();
-                        } else {
-                            let _ = crate::commands::window::show_and_focus_window(&window);
-                        }
+                    // Use our state tracker instead of is_visible() which is unreliable on Wayland
+                    let is_visible = is_window_visible();
+                    let tauri_visible = window.is_visible().unwrap_or(false);
+                    println!("Hotkey pressed - tracked state: {}, tauri is_visible: {}", is_visible, tauri_visible);
+
+                    if is_visible {
+                        println!("Hiding window via hotkey");
+                        // Emit event to frontend to set isHiding flag BEFORE hiding
+                        let _ = window.emit("intentional-hide", ());
+                        // Small delay to ensure event is processed
+                        std::thread::sleep(std::time::Duration::from_millis(10));
+                        let _ = window.hide();
+                        // Update our state tracker
+                        set_window_visible(false);
+                    } else {
+                        println!("Showing window via hotkey");
+                        let _ = crate::commands::window::show_and_focus_window(&window);
+                        // State is updated inside show_and_focus_window
                     }
                 }
             }

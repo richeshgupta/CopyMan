@@ -6,6 +6,7 @@ mod state;
 mod hotkeys;
 mod tray;
 mod settings;
+mod paste;
 
 use state::AppState;
 use std::sync::{Arc, Mutex};
@@ -73,6 +74,8 @@ pub fn run() {
                                         content_type: "text".to_string(),
                                         timestamp: chrono::Utc::now().timestamp(),
                                         preview,
+                                        is_pinned: false,
+                                        pin_order: None,
                                     };
 
                                     if let Ok(id) = crate::db::operations::insert_entry(&app_state.db.conn, &entry) {
@@ -101,6 +104,11 @@ pub fn run() {
             commands::clipboard::search_clipboard,
             commands::clipboard::copy_to_clipboard,
             commands::clipboard::clear_all_history,
+            commands::clipboard::pin_clipboard_entry,
+            commands::clipboard::unpin_clipboard_entry,
+            commands::clipboard::delete_clipboard_entry,
+            commands::clipboard::get_pinned_clipboard_entries,
+            commands::clipboard::paste_clipboard_text,
             commands::window::hide_window,
             commands::window::position_window_near_cursor,
             commands::settings::get_settings,

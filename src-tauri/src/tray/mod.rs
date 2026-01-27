@@ -1,10 +1,10 @@
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
     tray::{TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager, Emitter, Runtime, UserAttentionType,
+    AppHandle, Manager, Emitter, Runtime,
 };
 
-pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+pub fn create_tray(app: &AppHandle) -> Result<(), String> {
     // Build the tray menu
     let show_hide = MenuItemBuilder::with_id("show_hide", "Show/Hide CopyMan").build(app)
         .map_err(|e| format!("Failed to create show/hide menu item: {}", e))?;
@@ -32,12 +32,19 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
             match event.id().as_ref() {
                 "show_hide" => {
                     if let Some(window) = app.get_webview_window("main") {
-                        if let Ok(is_visible) = window.is_visible() {
-                            if is_visible {
-                                let _ = window.hide();
-                            } else {
-                                let _ = crate::commands::window::show_and_focus_window(&window);
-                            }
+                        // Use state tracker instead of is_visible() which is unreliable on Wayland
+                        let is_visible = crate::hotkeys::is_window_visible();
+
+                        if is_visible {
+                            // Emit event to frontend to set isHiding flag BEFORE hiding
+                            let _ = window.emit("intentional-hide", ());
+                            // Small delay to ensure event is processed
+                            std::thread::sleep(std::time::Duration::from_millis(10));
+                            let _ = window.hide();
+                            crate::hotkeys::set_window_visible(false);
+                        } else {
+                            let _ = crate::commands::window::show_and_focus_window(&window);
+                            // State is updated inside show_and_focus_window
                         }
                     }
                 }
@@ -79,12 +86,19 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
                 if button == tauri::tray::MouseButton::Left {
                     let app = tray.app_handle();
                     if let Some(window) = app.get_webview_window("main") {
-                        if let Ok(is_visible) = window.is_visible() {
-                            if is_visible {
-                                let _ = window.hide();
-                            } else {
-                                let _ = crate::commands::window::show_and_focus_window(&window);
-                            }
+                        // Use state tracker instead of is_visible() which is unreliable on Wayland
+                        let is_visible = crate::hotkeys::is_window_visible();
+
+                        if is_visible {
+                            // Emit event to frontend to set isHiding flag BEFORE hiding
+                            let _ = window.emit("intentional-hide", ());
+                            // Small delay to ensure event is processed
+                            std::thread::sleep(std::time::Duration::from_millis(10));
+                            let _ = window.hide();
+                            crate::hotkeys::set_window_visible(false);
+                        } else {
+                            let _ = crate::commands::window::show_and_focus_window(&window);
+                            // State is updated inside show_and_focus_window
                         }
                     }
                 }

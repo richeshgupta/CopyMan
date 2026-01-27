@@ -1,7 +1,8 @@
-use crate::db::operations::{ClipboardEntry, get_recent_entries, get_entry_by_id};
+use crate::db::operations::{ClipboardEntry, get_recent_entries, get_entry_by_id, pin_entry, unpin_entry, delete_entry, get_pinned_entries};
 use crate::state::AppState;
+use crate::paste;
 use std::sync::{Arc, Mutex};
-use tauri::State;
+use tauri::{State, AppHandle};
 
 #[tauri::command]
 pub fn get_clipboard_history(
@@ -61,5 +62,56 @@ pub fn clear_all_history(
         .map_err(|e| e.to_string())?
         .clear();
 
+    Ok(())
+}
+
+#[tauri::command]
+pub fn pin_clipboard_entry(
+    state: State<Arc<Mutex<AppState>>>,
+    id: i64,
+) -> Result<(), String> {
+    let app_state = state.lock().map_err(|e| e.to_string())?;
+    pin_entry(&app_state.db.conn, id)
+        .map_err(|e| format!("Failed to pin entry: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn unpin_clipboard_entry(
+    state: State<Arc<Mutex<AppState>>>,
+    id: i64,
+) -> Result<(), String> {
+    let app_state = state.lock().map_err(|e| e.to_string())?;
+    unpin_entry(&app_state.db.conn, id)
+        .map_err(|e| format!("Failed to unpin entry: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_clipboard_entry(
+    state: State<Arc<Mutex<AppState>>>,
+    id: i64,
+) -> Result<(), String> {
+    let app_state = state.lock().map_err(|e| e.to_string())?;
+    delete_entry(&app_state.db.conn, id)
+        .map_err(|e| format!("Failed to delete entry: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_pinned_clipboard_entries(
+    state: State<Arc<Mutex<AppState>>>,
+) -> Result<Vec<ClipboardEntry>, String> {
+    let app_state = state.lock().map_err(|e| e.to_string())?;
+    get_pinned_entries(&app_state.db.conn)
+        .map_err(|e| format!("Failed to get pinned entries: {}", e))
+}
+
+#[tauri::command]
+pub fn paste_clipboard_text(
+    text: String,
+    app: AppHandle,
+) -> Result<(), String> {
+    paste::paste_text(&app, &text)?;
     Ok(())
 }

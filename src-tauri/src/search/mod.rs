@@ -61,6 +61,8 @@ mod tests {
                 content_type: "text".to_string(),
                 timestamp: chrono::Utc::now().timestamp() + i,
                 preview: format!("hello world {}", i),
+                is_pinned: false,
+                pin_order: None,
             };
             let id = insert_entry(&db.conn, &entry).unwrap();
             search.add_to_trie(id, &entry.content);
@@ -83,6 +85,8 @@ mod tests {
             content_type: "text".to_string(),
             timestamp: chrono::Utc::now().timestamp(),
             preview: "unique search term".to_string(),
+            is_pinned: false,
+            pin_order: None,
         };
         insert_entry(&db.conn, &entry).unwrap();
 

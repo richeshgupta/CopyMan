@@ -1,10 +1,18 @@
 # CopyMan - Quick Start Guide
 
-## ✅ What's Been Built
+## ✅ What's Been Built - UPDATED WITH MACCY UI!
 
-CopyMan is now fully implemented and ready to test! Here's what you have:
+CopyMan has been transformed with a Maccy-inspired UI and new power features!
 
-### Features Implemented
+### 🆕 NEW Features (Maccy UI Update)
+- ✨ **Dark Mode** - Auto system detection + manual toggle
+- ✨ **Pin/Unpin Items** - Alt+P to pin favorites to top
+- ✨ **Delete Items** - Alt+Delete to remove individual entries
+- ✨ **Direct Paste** - Alt+Enter to paste without switching apps
+- ✨ **Tooltips** - Hover to see full content
+- ✨ **Maccy Aesthetic** - Clean, minimal design
+
+### ✅ Original Features
 - ✅ **Unlimited clipboard history** with SQLite + FTS5
 - ✅ **Fast hybrid search** (Trie + FTS5)
 - ✅ **Global hotkeys** (Ctrl+Shift+V, Ctrl+Shift+X)
@@ -24,7 +32,28 @@ CopyMan is now fully implemented and ready to test! Here's what you have:
 
 ## 🚀 How to Run CopyMan
 
-### Option 1: Development Mode (Recommended for Testing)
+### ⚠️ IMPORTANT: GPU/Graphics Fix
+
+You're in a headless environment. Use one of these scripts:
+
+**Option A: Software Rendering (Fastest)**
+```bash
+./run-dev.sh
+```
+
+**Option B: Virtual Display**
+```bash
+sudo apt install xvfb  # First time only
+./run-with-xvfb.sh
+```
+
+**Option C: Just Build (No Dev Server)**
+```bash
+npm run tauri build
+# Binary: src-tauri/target/release/copyman
+```
+
+### Option 1: Development Mode (With Display Server)
 
 ```bash
 cd /home/richesh/Desktop/expts/CopyMan
@@ -33,7 +62,7 @@ cd /home/richesh/Desktop/expts/CopyMan
 export PATH="/home/richesh/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH"
 
 # Run the app
-npm run tauri dev
+./run-dev.sh  # ← Use this instead of npm run tauri dev
 ```
 
 The app will:
@@ -100,9 +129,13 @@ copyman
 |----------|--------|
 | `Ctrl+Shift+V` | Show/hide CopyMan window |
 | `Ctrl+Shift+X` | Clear all history (with confirmation) |
+| `1-9, 0` | Quick select items (1=first, 0=10th) |
 | `↑` / `↓` | Navigate list |
 | `j` / `k` | Navigate list (vim-style) |
 | `Enter` | Copy selected item to clipboard |
+| **`Alt+Enter`** | **Paste directly (NEW)** ⭐ |
+| **`Alt+P`** | **Pin/unpin item (NEW)** ⭐ |
+| **`Delete`** | **Delete item (NEW)** ⭐ |
 | `Esc` | Clear search box |
 
 ---
@@ -172,15 +205,22 @@ cargo clean
 cargo build
 ```
 
-### Database Location
+### Database Location & Migration
 
 The clipboard database is stored at:
 ```
 ~/.local/share/com.copyman.app/clipboard.db
 ```
 
+**Automatic Migration:** Database migrates from v1 → v2 on first run
+- Adds `is_pinned` and `pin_order` columns
+- Preserves existing clipboard history
+- No manual steps needed
+
 To reset/delete:
 ```bash
+./reset-database.sh  # Safe: creates backup first
+# OR manually:
 rm -rf ~/.local/share/com.copyman.app/
 ```
 
@@ -188,7 +228,22 @@ rm -rf ~/.local/share/com.copyman.app/
 
 ## 📝 What Was Fixed
 
-During the build process, these issues were resolved:
+### Recent Fixes (Maccy UI Update)
+
+1. ✅ **Database Migration Error:** `no such column: is_pinned`
+   - **Cause:** INIT_SQL tried to create index before columns existed
+   - **Fix:** Moved column creation to migration system
+   - **Details:** See `MIGRATION_FIX.md`
+
+2. ✅ **GPU/Graphics Error:** `Could not create GBM EGL display`
+   - **Cause:** Headless environment (no display server)
+   - **Fix:** Created scripts with software rendering and Xvfb
+   - **Details:** See `GPU_FIX_GUIDE.md`
+
+3. ✅ **WebKit Warning:** `WEBKIT_FORCE_SANDBOX deprecated`
+   - **Fix:** Updated to recommended environment variables
+
+### Previous Fixes (Original Build)
 
 1. ✅ **Missing trait imports:**
    - Added `GlobalShortcutExt` for hotkey registration
@@ -222,10 +277,23 @@ During the build process, these issues were resolved:
 
 ## 📚 Additional Resources
 
+### Main Documentation
+- **Implementation Summary:** `IMPLEMENTATION_SUMMARY.md` - Full changelog
+- **README:** `README.md` - Project overview
+
+### Troubleshooting Guides (NEW)
+- **Migration Fix:** `MIGRATION_FIX.md` - Database migration details
+- **GPU Fix:** `GPU_FIX_GUIDE.md` - Graphics error solutions
+- **Quick Start:** `QUICK_START.md` - This file
+
+### Original Documentation
 - **Implementation Plan:** `docs/plans/2026-01-26-clipboard-manager.md`
-- **Implementation Summary:** `IMPLEMENTATION_SUMMARY.md`
 - **Performance Tests:** `docs/performance-tests.md`
-- **README:** `README.md`
+
+### Helper Scripts (NEW)
+- `run-dev.sh` - Dev mode with GPU workarounds
+- `run-with-xvfb.sh` - Virtual display for headless
+- `reset-database.sh` - Safe database reset
 
 ---
 

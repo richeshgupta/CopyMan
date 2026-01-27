@@ -3,7 +3,9 @@ import { svelte } from '@sveltejs/vite-plugin-svelte'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [svelte()],
+  plugins: [svelte({
+    configFile: './svelte.config.js'
+  })],
   clearScreen: false,
   server: {
     port: 5173,
