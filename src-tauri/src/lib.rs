@@ -39,58 +39,97 @@ pub fn run() {
             // Create system tray
             tray::create_tray(&app.handle())?;
 
+            // Listen for window focus events to sync our internal state
+            // This is critical because if the user clicks the window or al-tabs to it,
+            // our hotkey toggle logic needs to know it's visible to properly hide it next time.
+            if let Some(window) = app.get_webview_window("main") {
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::Focused(focused) = event {
+                        if *focused {
+                            println!("🎯 WINDOW EVENT: Focused(true) - Updating internal state");
+                            crate::hotkeys::set_window_visible(true);
+                        }
+                    }
+                });
+            }
+
             // Start clipboard monitor
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 let mut last_content: Option<String> = None;
+                
+                // Initialize clipboard once, outside the loop
+                // Retry a few times if it fails initially (common on startup)
+                let clipboard = loop {
+                    match arboard::Clipboard::new() {
+                        Ok(cb) => break Some(cb),
+                        Err(e) => {
+                            eprintln!("Failed to initialize clipboard: {}, retrying in 1s...", e);
+                            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                            // In case of persistent failure, we might want to break or continue retrying
+                            // For now, we'll keep retrying indefinitely or until it works
+                        }
+                    }
+                };
+
+                // If we somehow failed to get a clipboard instance (shouldn't happen with loop above), exit task
+                if clipboard.is_none() {
+                    eprintln!("CRITICAL: Could not initialize clipboard monitor task");
+                    return;
+                }
+                
+                let mut clipboard_instance = clipboard.unwrap();
 
                 loop {
                     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-                    let mut clipboard = match arboard::Clipboard::new() {
-                        Ok(cb) => cb,
-                        Err(_) => continue,
-                    };
+                    match clipboard_instance.get_text() {
+                        Ok(content) => {
+                            let has_changed = match &last_content {
+                                None => true,
+                                Some(last) => last != &content,
+                            };
 
-                    if let Ok(content) = clipboard.get_text() {
-                        let has_changed = match &last_content {
-                            None => true,
-                            Some(last) => last != &content,
-                        };
+                            if has_changed && !content.is_empty() {
+                                // Get app state and save to database
+                                if let Some(state) = app_handle.try_state::<Arc<Mutex<AppState>>>() {
+                                    if let Ok(app_state) = state.lock() {
+                                        let preview = if content.len() <= 100 {
+                                            content.clone()
+                                        } else {
+                                            format!("{}...", &content[..100])
+                                        };
 
-                        if has_changed && !content.is_empty() {
-                            // Get app state and save to database
-                            if let Some(state) = app_handle.try_state::<Arc<Mutex<AppState>>>() {
-                                if let Ok(app_state) = state.lock() {
-                                    let preview = if content.len() <= 100 {
-                                        content.clone()
-                                    } else {
-                                        format!("{}...", &content[..100])
-                                    };
+                                        let entry = crate::db::operations::ClipboardEntry {
+                                            id: None,
+                                            content: content.clone(),
+                                            content_type: "text".to_string(),
+                                            timestamp: chrono::Utc::now().timestamp(),
+                                            preview,
+                                            is_pinned: false,
+                                            pin_order: None,
+                                        };
 
-                                    let entry = crate::db::operations::ClipboardEntry {
-                                        id: None,
-                                        content: content.clone(),
-                                        content_type: "text".to_string(),
-                                        timestamp: chrono::Utc::now().timestamp(),
-                                        preview,
-                                        is_pinned: false,
-                                        pin_order: None,
-                                    };
+                                        if let Ok(id) = crate::db::operations::insert_entry(&app_state.db.conn, &entry) {
+                                            // Add to Trie for fast search
+                                            if let Ok(mut search) = app_state.search.lock() {
+                                                search.add_to_trie(id, &content);
+                                            }
 
-                                    if let Ok(id) = crate::db::operations::insert_entry(&app_state.db.conn, &entry) {
-                                        // Add to Trie for fast search
-                                        if let Ok(mut search) = app_state.search.lock() {
-                                            search.add_to_trie(id, &content);
+                                            // Emit event to frontend
+                                            let _ = app_handle.emit("clipboard-updated", entry);
                                         }
-
-                                        // Emit event to frontend
-                                        let _ = app_handle.emit("clipboard-updated", entry);
                                     }
                                 }
-                            }
 
-                            last_content = Some(content);
+                                last_content = Some(content);
+                            }
+                        },
+                        Err(_e) => {
+                            // Only log non-transient errors or debounce logging if needed
+                            // For now, simple error logging
+                            // eprintln!("Error reading clipboard: {}", _e); 
+                            // Re-initialization logic could go here if the connection is lost
                         }
                     }
                 }

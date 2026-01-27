@@ -2,7 +2,7 @@ use crate::db::operations::{ClipboardEntry, get_recent_entries, get_entry_by_id,
 use crate::state::AppState;
 use crate::paste;
 use std::sync::{Arc, Mutex};
-use tauri::{State, AppHandle};
+use tauri::{State, AppHandle, Manager};
 
 #[tauri::command]
 pub fn get_clipboard_history(
@@ -108,10 +108,22 @@ pub fn get_pinned_clipboard_entries(
 }
 
 #[tauri::command]
-pub fn paste_clipboard_text(
+pub async fn paste_clipboard_text(
     text: String,
     app: AppHandle,
 ) -> Result<(), String> {
+    // 1. Hide window first to return focus to previous app
+    println!("📋 PASTE_COMMAND: Hiding window before paste");
+    if let Some(window) = app.get_webview_window("main") {
+        crate::commands::window::hide_window(window)?;
+    }
+    
+    // 2. Wait for focus to switch (essential on Linux/X11)
+    println!("⏳ PASTE_COMMAND: Waiting 200ms for focus switch");
+    tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+    // 3. Simulate paste
+    println!("⌨️  PASTE_COMMAND: Executing paste");
     paste::paste_text(&app, &text)?;
     Ok(())
 }

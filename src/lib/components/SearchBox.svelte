@@ -22,6 +22,8 @@
   }
 
   function handleKeydown(event: KeyboardEvent) {
+    // Only handle Escape to clear search
+    // All shortcuts are now handled by ClipboardList's CAPTURE phase listener
     if (event.key === 'Escape') {
       inputValue = '';
       searchQuery.set('');
@@ -31,6 +33,9 @@
         inputElement.focus();
       }
     }
+
+    // All other keys (including shortcuts) are handled by capture phase
+    // Normal typing works as expected
   }
 
   onMount(() => {

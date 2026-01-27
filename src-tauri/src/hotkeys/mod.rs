@@ -1,14 +1,24 @@
 use tauri::{AppHandle, Manager, Emitter};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use crate::settings::Settings;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 static WINDOW_IS_VISIBLE: AtomicBool = AtomicBool::new(false);
+static LAST_TOGGLE_TIME: AtomicU64 = AtomicU64::new(0);
+
+fn get_now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
+}
 
 // Helper functions to manage window visibility state
 pub fn set_window_visible(visible: bool) {
     println!("🔄 STATE CHANGE: Setting window_visible to {} (was: {})", visible, WINDOW_IS_VISIBLE.load(Ordering::Relaxed));
     WINDOW_IS_VISIBLE.store(visible, Ordering::Relaxed);
+    LAST_TOGGLE_TIME.store(get_now_ms(), Ordering::Relaxed);
     println!("✅ STATE CONFIRMED: window_visible is now {}", WINDOW_IS_VISIBLE.load(Ordering::Relaxed));
 }
 
@@ -36,6 +46,17 @@ pub fn register_hotkeys_with_settings(app: &AppHandle, settings: &Settings) -> R
     app.global_shortcut()
         .on_shortcut(show_hide_key.as_str(), move |_app, _shortcut, event| {
             if event.state == ShortcutState::Pressed {
+                let now = get_now_ms();
+                let last = LAST_TOGGLE_TIME.load(Ordering::Relaxed);
+                
+                // Debounce: If less than 300ms since last action, ignore
+                // This prevents race condition where frontend handles keydown first, hides window,
+                // and then this global shortcut listener fires seeing state as hidden and tries to show it
+                if now.saturating_sub(last) < 300 {
+                    println!("⏳ DEBOUNCE: Hotkey ignored ({}ms since last action)", now.saturating_sub(last));
+                    return;
+                }
+
                 if let Some(window) = app_handle.get_webview_window("main") {
                     // Use our state tracker instead of is_visible() which is unreliable on Wayland
                     let is_visible = is_window_visible();
