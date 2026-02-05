@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
+import 'app_detection_service.dart';
 import 'storage_service.dart';
 
 class ClipboardService {
@@ -29,9 +30,25 @@ class ClipboardService {
       final text = data?.text;
       if (text != null && text.isNotEmpty && text != _lastContent) {
         _lastContent = text;
+
+        // Check if the foreground app is excluded
+        try {
+          final appName = await AppDetectionService.getForegroundApp();
+          if (appName != null) {
+            final isExcluded = await StorageService.instance.isAppExcluded(appName);
+            if (isExcluded) return; // Skip capturing from excluded apps
+          }
+        } catch (_) {
+          // If app detection fails, proceed with capture
+        }
+
         final id = await StorageService.instance.insertOrUpdate(text);
         onNewItem.add(id);
       }
+
+      // TODO: Image capture via Clipboard.getData('image/png'), hash with SHA256,
+      // store as (contentBytes, contentHash) in insertOrUpdate. Requires xclip polling
+      // on Linux or equivalent per-platform.
     } catch (_) {
       // Clipboard can be empty or contain only non-text data — ignore.
     }

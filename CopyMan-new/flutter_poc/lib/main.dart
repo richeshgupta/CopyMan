@@ -7,6 +7,9 @@ import 'package:hotkey_manager/hotkey_manager.dart';
 
 import 'app.dart';
 import 'services/storage_service.dart';
+import 'services/tray_service.dart';
+
+late TrayService _trayService;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,6 +37,15 @@ void main() async {
       await windowManager.hide();
     },
   );
+
+  // Initialize tray service
+  _trayService = TrayService(
+    onShow: () {
+      // Callback from tray — trigger window show through HomeScreen
+    },
+    onExit: () => exit(0),
+  );
+  await _trayService.init();
 
   runApp(const CopyManApp());
 }

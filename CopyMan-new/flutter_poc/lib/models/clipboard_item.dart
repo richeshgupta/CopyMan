@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 class ClipboardItem {
   final int id;
   final String content;
@@ -5,6 +7,8 @@ class ClipboardItem {
   final bool pinned;
   final int createdAt; // Unix timestamp ms
   final int updatedAt; // Unix timestamp ms
+  final Uint8List? contentBytes; // Future: for image/binary content
+  final String? contentHash; // Future: for deduplication
 
   ClipboardItem({
     required this.id,
@@ -13,6 +17,8 @@ class ClipboardItem {
     this.pinned = false,
     required this.createdAt,
     required this.updatedAt,
+    this.contentBytes,
+    this.contentHash,
   });
 
   factory ClipboardItem.fromMap(Map<String, dynamic> map) {
@@ -23,6 +29,8 @@ class ClipboardItem {
       pinned: (map['pinned'] as int) == 1,
       createdAt: map['created_at'] as int,
       updatedAt: map['updated_at'] as int,
+      contentBytes: map['content_bytes'] as Uint8List?,
+      contentHash: map['content_hash'] as String?,
     );
   }
 

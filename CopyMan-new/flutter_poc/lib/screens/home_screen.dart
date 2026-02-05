@@ -7,6 +7,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../models/clipboard_item.dart';
 import '../services/clipboard_service.dart';
+import '../services/fuzzy_search.dart';
 import '../services/hotkey_service.dart';
 import '../services/storage_service.dart';
 import '../widgets/clipboard_item_tile.dart';
@@ -29,7 +30,8 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   StreamSubscription<int>? _clipSub;
 
   // ── state ─────────────────────────────────────────────────────
-  List<ClipboardItem> _items = [];
+  List<ClipboardItem> _allItems = [];
+  List<FuzzyMatch> _matches = [];
   int _selectedIndex = 0;
   bool _hotkeyOk = false;
   bool _hiding = false; // guard against re-entrant hide calls
@@ -77,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     switch (event.logicalKey) {
       case LogicalKeyboardKey.arrowDown:
         setState(() {
-          if (_selectedIndex < _items.length - 1) _selectedIndex++;
+          if (_selectedIndex < _matches.length - 1) _selectedIndex++;
         });
         return true;
 
@@ -88,11 +90,15 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
         return true;
 
       case LogicalKeyboardKey.enter:
-        if (_selectedIndex >= 0 && _selectedIndex < _items.length) {
-          if (HardwareKeyboard.instance.isControlPressed) {
-            _copyAndPaste(_items[_selectedIndex]);
+        if (_selectedIndex >= 0 && _selectedIndex < _matches.length) {
+          final isShiftPressed = HardwareKeyboard.instance.isShiftPressed;
+          final isControlPressed = HardwareKeyboard.instance.isControlPressed;
+          if (isControlPressed && isShiftPressed) {
+            _pasteAsPlain(_matches[_selectedIndex].item);
+          } else if (isControlPressed) {
+            _copyAndPaste(_matches[_selectedIndex].item);
           } else {
-            _copyItem(_items[_selectedIndex]);
+            _copyItem(_matches[_selectedIndex].item);
           }
         }
         return true;
@@ -166,13 +172,19 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
 
   Future<void> _loadItems() async {
     final q = _searchCtrl.text.trim();
-    final items = await StorageService.instance.fetchItems(
-      search: q.isEmpty ? null : q,
-    );
+    // Always fetch all items for fuzzy search
+    final items = await StorageService.instance.fetchItems();
     if (mounted) {
       setState(() {
-        _items = items;
-        if (_selectedIndex >= items.length) _selectedIndex = 0;
+        _allItems = items;
+        // Apply fuzzy search
+        _matches = q.isEmpty
+            ? items
+                .map((item) =>
+                    FuzzyMatch(item: item, score: 0, matchIndices: []))
+                .toList()
+            : FuzzySearch.search(q, items);
+        if (_selectedIndex >= _matches.length) _selectedIndex = 0;
       });
     }
   }
@@ -201,14 +213,30 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     }
   }
 
+  Future<void> _pasteAsPlain(ClipboardItem item) async {
+    _clipService.setLastContent(item.content);
+    await Clipboard.setData(ClipboardData(text: item.content));
+    await _hideWindow();
+    // Give the OS a moment to restore focus to the previous window.
+    await Future.delayed(const Duration(milliseconds: 80));
+    try {
+      if (Platform.isLinux) {
+        await Process.run('xdotool', ['key', 'ctrl+shift+v']);
+      }
+      // Windows / macOS paste simulation — TODO
+    } catch (_) {
+      // xdotool not available; clipboard is set, user can Ctrl+V manually.
+    }
+  }
+
   Future<void> _togglePin(ClipboardItem item) async {
     await StorageService.instance.togglePin(item.id);
-    _loadItems();
+    await _loadItems();
   }
 
   Future<void> _deleteItem(ClipboardItem item) async {
     await StorageService.instance.deleteItem(item.id);
-    _loadItems();
+    await _loadItems();
   }
 
   Future<void> _deleteAll() async {
@@ -243,7 +271,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final pinnedCount = _items.where((i) => i.pinned).length;
+    final pinnedCount = _allItems.where((i) => i.pinned).length;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -302,7 +330,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '${_items.length} item${_items.length != 1 ? 's' : ''}'
+                  '${_allItems.length} item${_allItems.length != 1 ? 's' : ''}'
                   '${pinnedCount > 0 ? ' · $pinnedCount pinned' : ''}',
                   style: TextStyle(
                     fontSize: 11,
@@ -321,7 +349,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
 
           // ── item list ───────────────────────────────────────
           Expanded(
-            child: _items.isEmpty
+            child: _matches.isEmpty
                 ? Center(
                     child: Text(
                       _searchCtrl.text.isEmpty
@@ -335,20 +363,65 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
                     ),
                   )
                 : ListView.builder(
-                    itemCount: _items.length,
-                    itemBuilder: (ctx, i) => ClipboardItemTile(
-                      item: _items[i],
-                      isSelected: i == _selectedIndex,
-                      onTap: () {
-                        setState(() => _selectedIndex = i);
-                        _copyItem(_items[i]);
-                      },
-                      onDoubleTap: () => _copyAndPaste(_items[i]),
-                      onPin: () => _togglePin(_items[i]),
-                      onDelete: () => _deleteItem(_items[i]),
-                    ),
+                    itemCount: _matches.length,
+                    itemBuilder: (ctx, i) {
+                      final match = _matches[i];
+                      return ClipboardItemTile(
+                        item: match.item,
+                        isSelected: i == _selectedIndex,
+                        matchIndices: match.matchIndices,
+                        onTap: () {
+                          setState(() => _selectedIndex = i);
+                          _copyItem(match.item);
+                        },
+                        onDoubleTap: () => _copyAndPaste(match.item),
+                        onPin: () => _togglePin(match.item),
+                        onDelete: () => _deleteItem(match.item),
+                        onPasteAsPlain: () => _pasteAsPlain(match.item),
+                      );
+                    },
                   ),
           ),
+
+          // ── preview pane ─────────────────────────────────────
+          if (_matches.isNotEmpty)
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                border: Border(top: BorderSide(color: theme.dividerColor)),
+              ),
+              constraints: const BoxConstraints(maxHeight: 120),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    child: Text(
+                      'Preview',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: theme.colorScheme.secondary,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        child: Text(
+                          _matches[_selectedIndex].item.content,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.colorScheme.onSurface,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
           // ── bottom bar ──────────────────────────────────────
           Container(
@@ -361,7 +434,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Enter copy · Ctrl+Enter paste · Esc close',
+                  'Enter copy · Ctrl+Shift+Enter plain · Ctrl+Enter paste · Esc close',
                   style: TextStyle(
                     fontSize: 10,
                     color: theme.colorScheme.secondary,

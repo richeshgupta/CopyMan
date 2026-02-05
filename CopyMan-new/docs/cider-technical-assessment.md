@@ -117,16 +117,19 @@ These stem from constraints in Apple's MusicKit.js API, which Cider depends on f
 
 ## 7. Relevance to CopyMan
 
-Cider's architecture is a useful reference for CopyMan's own cross-platform strategy (Tauri + Svelte):
+Cider's architecture was initially considered for CopyMan as a Tauri + Svelte reference, but evaluation showed that **Tauri's focus-handling limitations make it unsuitable for a clipboard manager** (see `DECISION-FLUTTER-OVER-TAURI.md`). CopyMan instead uses **Flutter (Dart)**, which provides:
 
-| Concern | Cider's Approach | CopyMan's Approach (Tauri) |
+| Concern | Cider's Approach | CopyMan's Approach (Flutter) |
 |---|---|---|
-| App shell | Electron (macOS/Linux) + .NET/WebView2 (Windows) | Tauri (Rust + WebView2/WKWebView/GTK-rs) |
-| Frontend | Vue.js + TypeScript | Svelte + TypeScript |
-| Native backend | Split per OS | Single Rust binary (Tauri handles platform differences) |
-| Binary size | Large (Electron bundles Chromium) | Small (Tauri shares OS WebView) |
+| App shell | Electron (macOS/Linux) + .NET/WebView2 (Windows) | Flutter (Dart + native Skia rendering) |
+| Frontend | Vue.js + TypeScript | Dart + Material Design 3 |
+| Native backend | Split per OS | Single Dart codebase (Flutter handles platform differences) |
+| Binary size | Large (Electron bundles Chromium) | ~30–40 MB (includes Skia, no WebView overhead) |
+| Hotkey + focus | Not evaluated (Electron native support) | ✅ Works reliably on all platforms |
+| Clipboard access | Varies per platform | ✅ Native API, no WebView limitations |
+| Global hotkey handling | Not evaluated | ✅ `hotkey_manager` plugin; reliable system-level integration |
 
-Tauri's single-binary model is architecturally simpler than Cider's split-backend approach, while achieving similar platform coverage. The main trade-off is that Tauri's native API surface is more limited than .NET's on Windows and Electron's Node.js on macOS/Linux — something to keep in mind if CopyMan needs deep OS integration (e.g., clipboard watchers, global hotkeys, tray icons).
+Flutter's native rendering avoids WebView focus issues that plague Tauri and Electron for clipboard managers. See `DECISION-FLUTTER-OVER-TAURI.md` for the technical decision rationale and PoC results.
 
 ---
 
