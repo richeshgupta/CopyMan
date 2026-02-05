@@ -6,11 +6,15 @@ import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../models/clipboard_item.dart';
+import '../models/group.dart';
 import '../services/clipboard_service.dart';
 import '../services/fuzzy_search.dart';
+import '../services/group_service.dart';
 import '../services/hotkey_service.dart';
+import '../services/sequence_service.dart';
 import '../services/storage_service.dart';
 import '../widgets/clipboard_item_tile.dart';
+import '../widgets/groups_panel.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -36,6 +40,16 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   bool _hotkeyOk = false;
   bool _hiding = false; // guard against re-entrant hide calls
 
+  // ── groups ────────────────────────────────────────────────────
+  List<Group> _groups = [];
+  int? _selectedGroupId; // null = "All Items"
+  Map<int, int> _groupCounts = {}; // group id -> item count
+  bool _sidebarVisible = true; // collapsible sidebar
+
+  // ── multi-select & sequence ───────────────────────────────────
+  List<bool> _itemSelected = []; // Track which items are selected
+  final SequenceService _sequenceService = SequenceService();
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +69,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     _searchCtrl.addListener(_loadItems);
     HardwareKeyboard.instance.addHandler(_onKey);
 
+    _loadGroups();
     _loadItems();
   }
 
@@ -76,6 +91,34 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     if (event is! KeyDownEvent) return false;
     if (!_searchFocus.hasFocus) return false;
 
+    final isCtrl = HardwareKeyboard.instance.isControlPressed;
+    final isShift = HardwareKeyboard.instance.isShiftPressed;
+
+    // Ctrl+A: Toggle select all
+    if (event.logicalKey == LogicalKeyboardKey.keyA && isCtrl && !isShift) {
+      setState(() {
+        final allSelected = _itemSelected.every((x) => x);
+        for (int i = 0; i < _itemSelected.length; i++) {
+          _itemSelected[i] = !allSelected;
+        }
+      });
+      return true;
+    }
+
+    // Ctrl+Shift+S: Start sequence
+    if (event.logicalKey == LogicalKeyboardKey.keyS && isCtrl && isShift) {
+      _startSequence();
+      return true;
+    }
+
+    // Ctrl+V while in sequence mode: Advance to next item
+    if (event.logicalKey == LogicalKeyboardKey.keyV &&
+        isCtrl &&
+        _sequenceService.isActive) {
+      _advanceSequence();
+      return true;
+    }
+
     switch (event.logicalKey) {
       case LogicalKeyboardKey.arrowDown:
         setState(() {
@@ -91,11 +134,9 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
 
       case LogicalKeyboardKey.enter:
         if (_selectedIndex >= 0 && _selectedIndex < _matches.length) {
-          final isShiftPressed = HardwareKeyboard.instance.isShiftPressed;
-          final isControlPressed = HardwareKeyboard.instance.isControlPressed;
-          if (isControlPressed && isShiftPressed) {
+          if (isCtrl && isShift) {
             _pasteAsPlain(_matches[_selectedIndex].item);
-          } else if (isControlPressed) {
+          } else if (isCtrl) {
             _copyAndPaste(_matches[_selectedIndex].item);
           } else {
             _copyItem(_matches[_selectedIndex].item);
@@ -104,7 +145,11 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
         return true;
 
       case LogicalKeyboardKey.escape:
-        _hideWindow();
+        if (_sequenceService.isActive) {
+          setState(() => _sequenceService.cancel());
+        } else {
+          _hideWindow();
+        }
         return true;
 
       default:
@@ -170,10 +215,35 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
 
   // ── data ──────────────────────────────────────────────────────
 
+  Future<void> _loadGroups() async {
+    final groups = await GroupService.instance.fetchAllGroups();
+    final counts = <int, int>{};
+    for (final group in groups) {
+      counts[group.id] = await GroupService.instance.getGroupItemCount(group.id);
+    }
+
+    if (mounted) {
+      setState(() {
+        _groups = groups;
+        _groupCounts = counts;
+        _itemSelected = List.filled(_matches.length, false);
+      });
+    }
+  }
+
   Future<void> _loadItems() async {
     final q = _searchCtrl.text.trim();
-    // Always fetch all items for fuzzy search
-    final items = await StorageService.instance.fetchItems();
+
+    // Fetch items: all if no group selected, or specific group
+    List<ClipboardItem> items;
+    if (_selectedGroupId == null) {
+      // All items
+      items = await StorageService.instance.fetchItems();
+    } else {
+      // Items in selected group
+      items = await GroupService.instance.fetchItemsInGroup(_selectedGroupId!);
+    }
+
     if (mounted) {
       setState(() {
         _allItems = items;
@@ -185,6 +255,8 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
                 .toList()
             : FuzzySearch.search(q, items);
         if (_selectedIndex >= _matches.length) _selectedIndex = 0;
+        // Reset multi-select on reload
+        _itemSelected = List.filled(_matches.length, false);
       });
     }
   }
@@ -266,6 +338,157 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     }
   }
 
+  // ── groups ─────────────────────────────────────────────────────
+
+  Future<void> _onGroupSelected(int? groupId) async {
+    setState(() {
+      _selectedGroupId = groupId;
+    });
+    await _loadItems();
+  }
+
+  Future<void> _onGroupCreated() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New Group'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(hintText: 'Group name'),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+
+    if (name != null && name.isNotEmpty) {
+      try {
+        await GroupService.instance.createGroup(name);
+        await _loadGroups();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Group created: $name')),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
+    }
+    controller.dispose();
+  }
+
+  Future<void> _onGroupRenamed(Group group) async {
+    try {
+      await GroupService.instance.updateGroup(group.id, name: group.name);
+      await _loadGroups();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Group renamed: ${group.name}')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
+    }
+  }
+
+  Future<void> _onGroupDeleted(Group group) async {
+    try {
+      await GroupService.instance.deleteGroup(group.id, moveToGroupId: 1);
+      await _loadGroups();
+      await _loadItems();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Group deleted: ${group.name}')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
+    }
+  }
+
+  Future<void> _onMoveToGroup(ClipboardItem item) async {
+    final selectedGroup = await showDialog<int>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Move to Group'),
+        children: _groups
+            .map(
+              (group) => SimpleDialogOption(
+                onPressed: () => Navigator.pop(ctx, group.id),
+                child: Text(group.name),
+              ),
+            )
+            .toList(),
+      ),
+    );
+
+    if (selectedGroup != null) {
+      await GroupService.instance.moveItemToGroup(item.id, selectedGroup);
+      await _loadGroups();
+      await _loadItems();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Item moved')),
+      );
+    }
+  }
+
+  // ── multi-select & sequence ────────────────────────────────────
+
+  Future<void> _startSequence() async {
+    final selectedItems = <ClipboardItem>[];
+    for (int i = 0; i < _matches.length; i++) {
+      if (_itemSelected[i]) {
+        selectedItems.add(_matches[i].item);
+      }
+    }
+
+    if (selectedItems.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Select at least 2 items to start sequence'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _sequenceService.startSequence(selectedItems);
+      _itemSelected = List.filled(_matches.length, false);
+      // Set clipboard to first item
+      _clipService.setLastContent(selectedItems[0].content);
+      Clipboard.setData(ClipboardData(text: selectedItems[0].content));
+    });
+  }
+
+  Future<void> _advanceSequence() async {
+    _sequenceService.advance();
+
+    final item = _sequenceService.getCurrentItem();
+    if (item != null) {
+      _clipService.setLastContent(item.content);
+      await Clipboard.setData(ClipboardData(text: item.content));
+      setState(() {}); // Refresh UI to show new progress
+    } else {
+      // Sequence complete
+      setState(() => _sequenceService.cancel());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sequence complete')),
+        );
+      }
+    }
+  }
+
   // ── build ─────────────────────────────────────────────────────
 
   @override
@@ -275,16 +498,49 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: Column(
+      body: Row(
         children: [
-          // ── search bar ──────────────────────────────────────
+          // ── groups sidebar (collapsible) ─────────────────────
+          if (_sidebarVisible && _groups.isNotEmpty)
+            SizedBox(
+              width: 140,
+              child: GroupsPanel(
+                groups: _groups,
+                selectedGroupId: _selectedGroupId,
+                onGroupSelected: _onGroupSelected,
+                onNewGroup: _onGroupCreated,
+                onGroupRenamed: _onGroupRenamed,
+                onGroupDeleted: _onGroupDeleted,
+                groupCounts: _groupCounts,
+              ),
+            ),
+
+          // ── main content ────────────────────────────────────
+          Expanded(
+            child: Column(
+              children: [
+          // ── search bar + sidebar toggle ─────────────────────
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: theme.colorScheme.surface,
               border: Border(bottom: BorderSide(color: theme.dividerColor)),
             ),
-            child: TextField(
+            child: Row(
+              children: [
+                if (_groups.isNotEmpty)
+                  IconButton(
+                    icon: Icon(
+                      _sidebarVisible ? Icons.menu_open : Icons.menu,
+                      size: 18,
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => setState(() => _sidebarVisible = !_sidebarVisible),
+                    tooltip: 'Toggle sidebar',
+                  ),
+                Expanded(
+                  child: TextField(
               focusNode: _searchFocus,
               controller: _searchCtrl,
               autofocus: false,
@@ -319,25 +575,87 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 isDense: true,
               ),
+                  ),
+                ),
+              ],
             ),
           ),
 
-          // ── info strip ──────────────────────────────────────
+          // ── sequence mode indicator (if active) ────────────
+          if (_sequenceService.isActive)
+            Container(
+              color: theme.colorScheme.primary.withValues(alpha: 0.15),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Sequence Mode: ${_sequenceService.progress}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 16),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () {
+                      setState(() => _sequenceService.cancel());
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+          // ── info & multi-select strip ──────────────────────
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
             color: theme.colorScheme.surface,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  '${_allItems.length} item${_allItems.length != 1 ? 's' : ''}'
-                  '${pinnedCount > 0 ? ' · $pinnedCount pinned' : ''}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: theme.colorScheme.secondary,
+                Expanded(
+                  child: Text(
+                    _itemSelected.any((x) => x)
+                        ? '${_itemSelected.where((x) => x).length} selected'
+                        : '${_allItems.length} item${_allItems.length != 1 ? 's' : ''}'
+                            '${pinnedCount > 0 ? ' · $pinnedCount pinned' : ''}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: theme.colorScheme.secondary,
+                    ),
                   ),
                 ),
-                if (!_hotkeyOk)
+                if (_itemSelected.any((x) => x) && !_sequenceService.isActive)
+                  Row(
+                    children: [
+                      TextButton.icon(
+                        onPressed: _startSequence,
+                        icon: const Icon(Icons.repeat, size: 14),
+                        label: const Text('Sequence'),
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _itemSelected = List.filled(_matches.length, false);
+                          });
+                        },
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        child: const Text('Clear'),
+                      ),
+                    ],
+                  )
+                else if (!_hotkeyOk)
                   Text(
                     'Hotkey not registered',
                     style:
@@ -366,18 +684,38 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
                     itemCount: _matches.length,
                     itemBuilder: (ctx, i) {
                       final match = _matches[i];
-                      return ClipboardItemTile(
-                        item: match.item,
-                        isSelected: i == _selectedIndex,
-                        matchIndices: match.matchIndices,
-                        onTap: () {
-                          setState(() => _selectedIndex = i);
-                          _copyItem(match.item);
+                      final isInMultiSelectMode = _itemSelected.any((x) => x);
+
+                      // Multi-select via Ctrl+Click
+                      return GestureDetector(
+                        onLongPress: () {
+                          setState(() {
+                            _itemSelected[i] = !_itemSelected[i];
+                          });
                         },
-                        onDoubleTap: () => _copyAndPaste(match.item),
-                        onPin: () => _togglePin(match.item),
-                        onDelete: () => _deleteItem(match.item),
-                        onPasteAsPlain: () => _pasteAsPlain(match.item),
+                        child: ClipboardItemTile(
+                          item: match.item,
+                          isSelected: i == _selectedIndex,
+                          matchIndices: match.matchIndices,
+                          isMultiSelectMode: isInMultiSelectMode,
+                          isCheckboxChecked: _itemSelected[i],
+                          onCheckboxChanged: (checked) {
+                            setState(() => _itemSelected[i] = checked);
+                          },
+                          onTap: () {
+                            if (isInMultiSelectMode) {
+                              setState(() => _itemSelected[i] = !_itemSelected[i]);
+                            } else {
+                              setState(() => _selectedIndex = i);
+                              _copyItem(match.item);
+                            }
+                          },
+                          onDoubleTap: () => _copyAndPaste(match.item),
+                          onPin: () => _togglePin(match.item),
+                          onDelete: () => _deleteItem(match.item),
+                          onPasteAsPlain: () => _pasteAsPlain(match.item),
+                          onMoveToGroup: _onMoveToGroup,
+                        ),
                       );
                     },
                   ),
@@ -451,6 +789,9 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
               ],
             ),
           ),
+              ], // Close children list of Column
+            ), // Close Column
+          ), // Close Expanded (main content)
         ],
       ),
     );

@@ -11,6 +11,10 @@ class ClipboardItemTile extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onPasteAsPlain;
   final List<int> matchIndices;
+  final bool isMultiSelectMode;
+  final bool isCheckboxChecked;
+  final ValueChanged<bool>? onCheckboxChanged;
+  final Function(ClipboardItem)? onMoveToGroup;
 
   const ClipboardItemTile({
     super.key,
@@ -22,6 +26,10 @@ class ClipboardItemTile extends StatelessWidget {
     required this.onDelete,
     required this.onPasteAsPlain,
     this.matchIndices = const [],
+    this.isMultiSelectMode = false,
+    this.isCheckboxChecked = false,
+    this.onCheckboxChanged,
+    this.onMoveToGroup,
   });
 
   @override
@@ -55,6 +63,25 @@ class ClipboardItemTile extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Multi-select checkbox (if in multi-select mode)
+                  if (isMultiSelectMode)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8, top: 1),
+                      child: GestureDetector(
+                        onTap: () => onCheckboxChanged?.call(!isCheckboxChecked),
+                        child: Icon(
+                          isCheckboxChecked
+                              ? Icons.check_box
+                              : Icons.check_box_outline_blank,
+                          size: 16,
+                          color: isCheckboxChecked
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.secondary,
+                        ),
+                      ),
+                    ),
+
+                  // Pin indicator
                   if (item.pinned)
                     Padding(
                       padding: const EdgeInsets.only(right: 6, top: 1),
@@ -119,7 +146,7 @@ class ClipboardItemTile extends StatelessWidget {
   Future<void> _showContextMenu(BuildContext context, Offset position) async {
     final result = await showMenu<String>(
       context: context,
-      position: RelativeRect.fromLTRB(position.dx, position.dy, position.dx + 140, position.dy + 110),
+      position: RelativeRect.fromLTRB(position.dx, position.dy, position.dx + 160, position.dy + 130),
       items: [
         PopupMenuItem<String>(
           value: 'pin',
@@ -155,6 +182,16 @@ class ClipboardItemTile extends StatelessWidget {
           ),
         ),
         PopupMenuItem<String>(
+          value: 'move_to_group',
+          child: const Row(
+            children: [
+              Icon(Icons.folder_open_outlined, size: 16),
+              SizedBox(width: 10),
+              Text('Move to Group'),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
           value: 'delete',
           child: const Row(
             children: [
@@ -176,6 +213,9 @@ class ClipboardItemTile extends StatelessWidget {
         break;
       case 'paste_plain':
         onPasteAsPlain();
+        break;
+      case 'move_to_group':
+        onMoveToGroup?.call(item);
         break;
       case 'delete':
         onDelete();

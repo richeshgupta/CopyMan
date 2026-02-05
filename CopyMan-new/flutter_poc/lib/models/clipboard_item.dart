@@ -9,6 +9,7 @@ class ClipboardItem {
   final int updatedAt; // Unix timestamp ms
   final Uint8List? contentBytes; // Future: for image/binary content
   final String? contentHash; // Future: for deduplication
+  final int? groupId; // null = uncategorized; FK to groups.id
 
   ClipboardItem({
     required this.id,
@@ -19,6 +20,7 @@ class ClipboardItem {
     required this.updatedAt,
     this.contentBytes,
     this.contentHash,
+    this.groupId,
   });
 
   factory ClipboardItem.fromMap(Map<String, dynamic> map) {
@@ -31,6 +33,7 @@ class ClipboardItem {
       updatedAt: map['updated_at'] as int,
       contentBytes: map['content_bytes'] as Uint8List?,
       contentHash: map['content_hash'] as String?,
+      groupId: map['group_id'] as int?,
     );
   }
 

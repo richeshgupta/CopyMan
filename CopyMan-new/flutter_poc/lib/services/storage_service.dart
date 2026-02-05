@@ -27,7 +27,7 @@ class StorageService {
 
     _db = await openDatabase(
       '${appDir.path}/copyman.db',
-      version: 2,
+      version: 3,
       onCreate: _createTables,
       onUpgrade: _upgradeDatabase,
     );
@@ -36,6 +36,30 @@ class StorageService {
   }
 
   Future<void> _createTables(Database db, int version) async {
+    // Create groups table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS groups (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        name      TEXT UNIQUE NOT NULL,
+        color     TEXT DEFAULT '#4CAF50',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
+
+    // Create default "Uncategorized" group
+    await db.insert(
+      'groups',
+      {
+        'id': 1,
+        'name': 'Uncategorized',
+        'color': '#9E9E9E',
+        'created_at': DateTime.now().millisecondsSinceEpoch,
+        'updated_at': DateTime.now().millisecondsSinceEpoch,
+      },
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+
     await db.execute('''
       CREATE TABLE IF NOT EXISTS clipboard_items (
         id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,12 +69,17 @@ class StorageService {
         created_at     INTEGER NOT NULL,
         updated_at     INTEGER NOT NULL,
         content_bytes  BLOB,
-        content_hash   TEXT
+        content_hash   TEXT,
+        group_id       INTEGER DEFAULT 1 REFERENCES groups(id) ON DELETE SET NULL
       )
     ''');
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_order
         ON clipboard_items(pinned DESC, updated_at DESC)
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_group_id
+        ON clipboard_items(group_id)
     ''');
     await db.execute('''
       CREATE TABLE IF NOT EXISTS app_exclusions (
@@ -104,6 +133,38 @@ class StorageService {
       await db.insert('app_exclusions', {'app_name': 'Enpass', 'blocked': 1}, conflictAlgorithm: ConflictAlgorithm.ignore);
       await db.insert('app_exclusions', {'app_name': 'Dashlane', 'blocked': 1}, conflictAlgorithm: ConflictAlgorithm.ignore);
       await db.insert('app_exclusions', {'app_name': 'Keeper', 'blocked': 1}, conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
+
+    if (oldVersion < 3) {
+      // v2 → v3: Add groups table and group_id column
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS groups (
+          id        INTEGER PRIMARY KEY AUTOINCREMENT,
+          name      TEXT UNIQUE NOT NULL,
+          color     TEXT DEFAULT '#4CAF50',
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      ''');
+
+      // Create default "Uncategorized" group
+      await db.insert(
+        'groups',
+        {
+          'id': 1,
+          'name': 'Uncategorized',
+          'color': '#9E9E9E',
+          'created_at': DateTime.now().millisecondsSinceEpoch,
+          'updated_at': DateTime.now().millisecondsSinceEpoch,
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+
+      // Add group_id column to existing clipboard_items table
+      await db.execute('ALTER TABLE clipboard_items ADD COLUMN group_id INTEGER DEFAULT 1');
+
+      // Create index for fast group filtering
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_group_id ON clipboard_items(group_id)');
     }
   }
 
