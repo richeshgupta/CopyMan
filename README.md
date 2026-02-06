@@ -35,9 +35,76 @@ A lightweight, fast, and feature-rich clipboard manager for Linux, Windows, and 
 
 ---
 
-## 🚀 Quick Start
+## 📥 Installation
 
-### For Users
+### Pre-built Binary (Recommended) — Linux
+
+The easiest way to get started! Download and run in 3 steps.
+
+#### Step 1: Download Latest Release
+
+```bash
+# Download the latest release
+wget https://github.com/richeshgupta/CopyMan/releases/latest/download/copyman-0.1.0-linux-x64.tar.gz
+
+# (Optional) Verify checksum for security
+wget https://github.com/richeshgupta/CopyMan/releases/latest/download/copyman-0.1.0-linux-x64.tar.gz.sha256
+sha256sum -c copyman-0.1.0-linux-x64.tar.gz.sha256
+```
+
+#### Step 2: Extract the Archive
+
+```bash
+tar xzf copyman-0.1.0-linux-x64.tar.gz
+cd copyman-0.1.0-linux-x64
+```
+
+#### Step 3: Install
+
+```bash
+./install.sh
+```
+
+The installer will place CopyMan in `~/.local/` (no sudo required).
+
+#### Step 4: Run CopyMan
+
+```bash
+copyman
+```
+
+Or find **CopyMan** in your applications menu (may require logout/login for app launcher to refresh).
+
+#### System Requirements
+
+**OS:** Linux x86_64 (Ubuntu 20.04+, Fedora 35+, Arch, or equivalent)
+
+**Libraries:** Most Linux desktop systems have these pre-installed. If CopyMan won't start, install:
+
+```bash
+# Debian/Ubuntu
+sudo apt-get install libgtk-3-0 libsqlite3-0
+
+# Fedora/RHEL
+sudo dnf install gtk3 sqlite
+
+# Arch Linux
+sudo pacman -S gtk3 sqlite
+```
+
+#### Uninstall
+
+```bash
+~/.local/share/copyman/uninstall.sh
+```
+
+---
+
+## 🚀 Quick Start (Build from Source)
+
+### For Developers
+
+If you prefer to build from source:
 
 ```bash
 cd copyman
@@ -46,7 +113,7 @@ flutter build linux --release
 ./build/linux/x64/release/bundle/copyman
 ```
 
-### For Developers
+Or use `flutter run` for development:
 
 ```bash
 cd copyman

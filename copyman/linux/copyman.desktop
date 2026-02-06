@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=CopyMan
+Comment=Cross-Platform Clipboard Manager
+Exec=copyman
+Icon=com.richeshgupta.copyman
+Terminal=false
+Type=Application
+Categories=Utility;System;
+StartupWMClass=copyman
+Keywords=clipboard;manager;copy;paste;history;

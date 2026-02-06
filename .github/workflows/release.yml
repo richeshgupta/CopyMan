@@ -1,0 +1,243 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-linux-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history needed for changelog extraction
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.9'
+          channel: 'stable'
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libsqlite3-dev \
+            libkeybinder-3.0-0 \
+            libx11-dev \
+            libxext-dev \
+            libxrender-dev
+
+      - name: Get Flutter dependencies
+        run: |
+          cd copyman
+          flutter pub get
+
+      - name: Build Linux release
+        run: |
+          cd copyman
+          flutter build linux --release
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "TARBALL_NAME=copyman-${VERSION}-linux-x64" >> $GITHUB_OUTPUT
+
+      - name: Create release tarball
+        run: |
+          cd copyman/build/linux/x64/release/bundle
+
+          # Create release directory structure
+          mkdir -p ../../../../../../../release/${{ steps.version.outputs.TARBALL_NAME }}
+
+          # Copy binary and assets
+          cp -r . ../../../../../../../release/${{ steps.version.outputs.TARBALL_NAME }}/
+
+          # Copy desktop entry
+          cp ../../../../../../../../linux/copyman.desktop ../../../../../../../release/${{ steps.version.outputs.TARBALL_NAME }}/
+
+          # Copy icons
+          cp -r ../../../../../../../../linux/icons ../../../../../../../release/${{ steps.version.outputs.TARBALL_NAME }}/
+
+          # Create install script
+          cat > ../../../../../../../release/${{ steps.version.outputs.TARBALL_NAME }}/install.sh << 'INSTALL_EOF'
+#!/bin/bash
+set -e
+
+# CopyMan Installation Script
+# Installs CopyMan to ~/.local/ (XDG Base Directory compliant, no sudo required)
+
+INSTALL_DIR="$HOME/.local/share/copyman"
+BIN_DIR="$HOME/.local/bin"
+APPS_DIR="$HOME/.local/share/applications"
+ICONS_DIR="$HOME/.local/share/icons"
+
+echo "Installing CopyMan to $INSTALL_DIR..."
+
+# Create directories
+mkdir -p "$INSTALL_DIR"
+mkdir -p "$BIN_DIR"
+mkdir -p "$APPS_DIR"
+mkdir -p "$ICONS_DIR"
+
+# Copy application bundle
+cp -r . "$INSTALL_DIR"
+
+# Create wrapper script in ~/.local/bin
+cat > "$BIN_DIR/copyman" << 'WRAPPER_EOF'
+#!/bin/bash
+exec "$HOME/.local/share/copyman/copyman" "$@"
+WRAPPER_EOF
+chmod +x "$BIN_DIR/copyman"
+
+# Copy desktop entry
+if [ -f "$INSTALL_DIR/copyman.desktop" ]; then
+    sed "s|Exec=copyman|Exec=$BIN_DIR/copyman|g" "$INSTALL_DIR/copyman.desktop" > "$APPS_DIR/com.richeshgupta.copyman.desktop"
+    chmod 644 "$APPS_DIR/com.richeshgupta.copyman.desktop"
+fi
+
+# Copy icons to ~/.local/share/icons
+if [ -d "$INSTALL_DIR/icons" ]; then
+    cp -r "$INSTALL_DIR/icons"/* "$ICONS_DIR/" 2>/dev/null || true
+fi
+
+# Update desktop database cache (gracefully handle if commands don't exist)
+if command -v update-desktop-database &> /dev/null; then
+    update-desktop-database "$APPS_DIR" 2>/dev/null || true
+fi
+
+# Update icon cache (gracefully handle if command doesn't exist)
+if command -v gtk-update-icon-cache &> /dev/null; then
+    for size in 16x16 32x32 48x48 64x64 128x128 256x256; do
+        if [ -d "$ICONS_DIR/hicolor/$size" ]; then
+            gtk-update-icon-cache "$ICONS_DIR/hicolor" 2>/dev/null || true
+        fi
+    done
+fi
+
+echo "✅ CopyMan installed successfully!"
+echo ""
+echo "To run CopyMan:"
+echo "  copyman"
+echo ""
+echo "You may need to:"
+echo "  1. Close and reopen your terminal (to update \$PATH)"
+echo "  2. Log out and log in (for .desktop entry to appear in app launcher)"
+echo ""
+echo "To uninstall:"
+echo "  $INSTALL_DIR/uninstall.sh"
+INSTALL_EOF
+          chmod +x ../../../../../../../release/${{ steps.version.outputs.TARBALL_NAME }}/install.sh
+
+          # Create uninstall script
+          cat > ../../../../../../../release/${{ steps.version.outputs.TARBALL_NAME }}/uninstall.sh << 'UNINSTALL_EOF'
+#!/bin/bash
+set -e
+
+INSTALL_DIR="$HOME/.local/share/copyman"
+BIN_DIR="$HOME/.local/bin"
+APPS_DIR="$HOME/.local/share/applications"
+ICONS_DIR="$HOME/.local/share/icons"
+
+echo "Uninstalling CopyMan..."
+
+# Remove installation directory
+if [ -d "$INSTALL_DIR" ]; then
+    rm -rf "$INSTALL_DIR"
+    echo "Removed $INSTALL_DIR"
+fi
+
+# Remove symlink/wrapper from bin
+if [ -f "$BIN_DIR/copyman" ]; then
+    rm -f "$BIN_DIR/copyman"
+    echo "Removed $BIN_DIR/copyman"
+fi
+
+# Remove desktop entry
+if [ -f "$APPS_DIR/com.richeshgupta.copyman.desktop" ]; then
+    rm -f "$APPS_DIR/com.richeshgupta.copyman.desktop"
+    echo "Removed desktop entry"
+fi
+
+# Remove icons
+if [ -d "$ICONS_DIR/hicolor" ]; then
+    for size in 16x16 32x32 48x48 64x64 128x128 256x256; do
+        rm -f "$ICONS_DIR/hicolor/$size/apps/com.richeshgupta.copyman.png"
+    done
+    echo "Removed icons"
+fi
+
+# Update caches
+if command -v update-desktop-database &> /dev/null; then
+    update-desktop-database "$APPS_DIR" 2>/dev/null || true
+fi
+
+if command -v gtk-update-icon-cache &> /dev/null; then
+    gtk-update-icon-cache "$ICONS_DIR/hicolor" 2>/dev/null || true
+fi
+
+echo "✅ CopyMan uninstalled successfully"
+UNINSTALL_EOF
+          chmod +x ../../../../../../../release/${{ steps.version.outputs.TARBALL_NAME }}/uninstall.sh
+
+          # Copy LICENSE
+          cp ../../../../../../../LICENSE ../../../../../../../release/${{ steps.version.outputs.TARBALL_NAME }}/
+
+          # Create tarball
+          cd ../../../../../../../release
+          tar czf ${{ steps.version.outputs.TARBALL_NAME }}.tar.gz ${{ steps.version.outputs.TARBALL_NAME }}/
+
+          # Generate checksum
+          sha256sum ${{ steps.version.outputs.TARBALL_NAME }}.tar.gz > ${{ steps.version.outputs.TARBALL_NAME }}.tar.gz.sha256
+
+          echo "Tarball created: ${{ steps.version.outputs.TARBALL_NAME }}.tar.gz"
+          echo "Contents:"
+          ls -lh ${{ steps.version.outputs.TARBALL_NAME }}.tar.gz*
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+
+          # Extract changelog section from CHANGELOG.md
+          # Pattern: from "## [VERSION]" to next "## [" or EOF
+          CHANGELOG=$(awk "
+            /^## \[$VERSION\]/ {
+              found=1
+              getline
+              next
+            }
+            found && /^## \[/ {
+              exit
+            }
+            found {
+              print
+            }
+          " CHANGELOG.md | sed '/^$/d')
+
+          # If no changelog section found, use tag message
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG=$(git tag -l $GITHUB_REF -n 100)
+          fi
+
+          # Store in output file to handle multiline content
+          echo "$CHANGELOG" > changelog.txt
+          echo "Extracted changelog:"
+          cat changelog.txt
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ github.ref_name }}
+          name: CopyMan ${{ steps.version.outputs.VERSION }}
+          bodyFile: changelog.txt
+          artifacts: release/${{ steps.version.outputs.TARBALL_NAME }}.tar.gz,release/${{ steps.version.outputs.TARBALL_NAME }}.tar.gz.sha256
+          draft: false
+          prerelease: false
+          makeLatest: true
