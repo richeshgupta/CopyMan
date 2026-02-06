@@ -35,6 +35,11 @@ class ClipboardItemTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final bgColor = isCheckboxChecked
+        ? theme.colorScheme.primary.withValues(alpha: 0.15)
+        : isSelected
+            ? theme.colorScheme.primary.withValues(alpha: 0.1)
+            : null;
 
     return GestureDetector(
       onTap: onTap,
@@ -42,74 +47,51 @@ class ClipboardItemTile extends StatelessWidget {
       onSecondaryTapDown: (details) {
         _showContextMenu(context, details.globalPosition);
       },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? theme.colorScheme.primary.withValues(alpha: 0.1)
-              : null,
-          borderRadius: BorderRadius.circular(6),
-          border: Border(
-            left: item.pinned
-                ? BorderSide(color: theme.colorScheme.primary, width: 3)
-                : BorderSide.none,
+      child: MouseRegion(
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(6),
+            border: Border(
+              left: item.pinned
+                  ? BorderSide(color: theme.colorScheme.primary, width: 2)
+                  : BorderSide.none,
+            ),
           ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Multi-select checkbox (if in multi-select mode)
-                  if (isMultiSelectMode)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8, top: 1),
-                      child: GestureDetector(
-                        onTap: () => onCheckboxChanged?.call(!isCheckboxChecked),
-                        child: Icon(
-                          isCheckboxChecked
-                              ? Icons.check_box
-                              : Icons.check_box_outline_blank,
-                          size: 16,
-                          color: isCheckboxChecked
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.secondary,
-                        ),
-                      ),
-                    ),
-
-                  // Pin indicator
-                  if (item.pinned)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6, top: 1),
-                      child: Icon(
-                        Icons.push_pin,
-                        size: 13,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                  Expanded(
-                    child: RichText(
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      text: _buildHighlightedText(theme),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Row(
+              children: [
+                // Pin icon
+                if (item.pinned)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: Icon(
+                      Icons.push_pin,
+                      size: 12,
+                      color: theme.colorScheme.primary,
                     ),
                   ),
-                  // TODO: Image thumbnail rendering if item.contentBytes != null
-                ],
-              ),
-              const SizedBox(height: 3),
-              Text(
-                item.relativeTime,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: theme.colorScheme.secondary,
+                // Content
+                Expanded(
+                  child: RichText(
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    text: _buildHighlightedText(theme),
+                  ),
                 ),
-              ),
-            ],
+                // Relative time
+                const SizedBox(width: 8),
+                Text(
+                  item.relativeTime,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: theme.colorScheme.secondary,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -161,9 +143,9 @@ class ClipboardItemTile extends StatelessWidget {
             ],
           ),
         ),
-        PopupMenuItem<String>(
+        const PopupMenuItem<String>(
           value: 'copy',
-          child: const Row(
+          child: Row(
             children: [
               Icon(Icons.copy_outlined, size: 16),
               SizedBox(width: 10),
@@ -171,9 +153,9 @@ class ClipboardItemTile extends StatelessWidget {
             ],
           ),
         ),
-        PopupMenuItem<String>(
+        const PopupMenuItem<String>(
           value: 'paste_plain',
-          child: const Row(
+          child: Row(
             children: [
               Icon(Icons.text_fields, size: 16),
               SizedBox(width: 10),
@@ -181,9 +163,9 @@ class ClipboardItemTile extends StatelessWidget {
             ],
           ),
         ),
-        PopupMenuItem<String>(
+        const PopupMenuItem<String>(
           value: 'move_to_group',
-          child: const Row(
+          child: Row(
             children: [
               Icon(Icons.folder_open_outlined, size: 16),
               SizedBox(width: 10),
@@ -191,9 +173,9 @@ class ClipboardItemTile extends StatelessWidget {
             ],
           ),
         ),
-        PopupMenuItem<String>(
+        const PopupMenuItem<String>(
           value: 'delete',
-          child: const Row(
+          child: Row(
             children: [
               Icon(Icons.delete_outline, size: 16),
               SizedBox(width: 10),
