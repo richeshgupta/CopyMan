@@ -245,8 +245,9 @@ class StorageService {
 
   // ── housekeeping ──────────────────────────────────────────────
 
-  /// Remove oldest unpinned rows beyond the limit.
+  /// Remove oldest unpinned rows beyond the limit, and TTL-expired items.
   Future<void> _enforceLimit() async {
+    await clearExpiredItems();
     await db.rawDelete('''
       DELETE FROM clipboard_items
       WHERE id IN (
@@ -277,6 +278,45 @@ class StorageService {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
     _cachedHistoryLimit = limit;
+  }
+
+  // ── generic settings ─────────────────────────────────────────────
+
+  Future<String?> getSetting(String key) async {
+    final result = await db.query(
+      'settings',
+      where: 'key = ?',
+      whereArgs: [key],
+    );
+    if (result.isEmpty) return null;
+    return result.first['value'] as String;
+  }
+
+  Future<void> setSetting(String key, String value) async {
+    await db.insert(
+      'settings',
+      {'key': key, 'value': value},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  // ── TTL auto-clear ──────────────────────────────────────────────
+
+  Future<void> clearExpiredItems() async {
+    final ttlEnabled = await getSetting('ttl_enabled');
+    if (ttlEnabled != 'true') return;
+
+    final ttlHoursStr = await getSetting('ttl_hours');
+    final ttlHours = int.tryParse(ttlHoursStr ?? '') ?? 72;
+
+    final cutoff = DateTime.now()
+        .subtract(Duration(hours: ttlHours))
+        .millisecondsSinceEpoch;
+
+    await db.rawDelete(
+      'DELETE FROM clipboard_items WHERE pinned = 0 AND created_at < ?',
+      [cutoff],
+    );
   }
 
   // ── exclusions ─────────────────────────────────────────────────

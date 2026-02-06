@@ -13,6 +13,8 @@ import '../services/group_service.dart';
 import '../services/hotkey_service.dart';
 import '../services/sequence_service.dart';
 import '../services/storage_service.dart';
+import '../app.dart';
+import '../screens/settings_screen.dart';
 import '../widgets/clipboard_item_tile.dart';
 import '../widgets/groups_panel.dart';
 
@@ -416,6 +418,30 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     }
   }
 
+  Future<void> _onGroupColorChanged(Group group, String color) async {
+    try {
+      await GroupService.instance.updateGroup(group.id, color: color);
+      await _loadGroups();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
+    }
+  }
+
+  Future<void> _openSettings() async {
+    final appState = context.findAncestorStateOfType<CopyManAppState>();
+    await showDialog(
+      context: context,
+      builder: (ctx) => SettingsScreen(
+        currentThemeMode: appState?.themeModeString ?? 'system',
+        onThemeModeChanged: (mode) {
+          appState?.setThemeMode(mode);
+        },
+      ),
+    );
+  }
+
   Future<void> _onMoveToGroup(ClipboardItem item) async {
     final selectedGroup = await showDialog<int>(
       context: context,
@@ -511,6 +537,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
                 onNewGroup: _onGroupCreated,
                 onGroupRenamed: _onGroupRenamed,
                 onGroupDeleted: _onGroupDeleted,
+                onGroupColorChanged: _onGroupColorChanged,
                 groupCounts: _groupCounts,
               ),
             ),
@@ -539,6 +566,15 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
                     onPressed: () => setState(() => _sidebarVisible = !_sidebarVisible),
                     tooltip: 'Toggle sidebar',
                   ),
+                IconButton(
+                  icon: Icon(Icons.settings_outlined, size: 18,
+                      color: theme.colorScheme.secondary),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: _openSettings,
+                  tooltip: 'Settings',
+                ),
+                const SizedBox(width: 6),
                 Expanded(
                   child: TextField(
               focusNode: _searchFocus,

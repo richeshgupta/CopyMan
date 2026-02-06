@@ -2,6 +2,18 @@ import 'package:flutter/material.dart';
 
 import '../models/group.dart';
 
+/// Preset color palette for group color picker.
+const List<String> kGroupColorPresets = [
+  '#F44336', // Red
+  '#E91E63', // Pink
+  '#9C27B0', // Purple
+  '#3F51B5', // Indigo
+  '#2196F3', // Blue
+  '#009688', // Teal
+  '#4CAF50', // Green
+  '#FF9800', // Orange
+];
+
 class GroupsPanel extends StatefulWidget {
   final List<Group> groups;
   final int? selectedGroupId;
@@ -9,6 +21,7 @@ class GroupsPanel extends StatefulWidget {
   final VoidCallback onNewGroup;
   final Function(Group) onGroupRenamed;
   final Function(Group) onGroupDeleted;
+  final Function(Group, String) onGroupColorChanged;
   final Map<int, int> groupCounts; // group id -> item count
 
   const GroupsPanel({
@@ -18,6 +31,7 @@ class GroupsPanel extends StatefulWidget {
     required this.onNewGroup,
     required this.onGroupRenamed,
     required this.onGroupDeleted,
+    required this.onGroupColorChanged,
     required this.groupCounts,
   });
 
@@ -84,20 +98,16 @@ class _GroupsPanelState extends State<GroupsPanel> {
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     child: Row(
                       children: [
-                        // Checkbox / icon
-                        if (isSelected)
-                          Icon(
-                            Icons.check_circle,
-                            size: 16,
-                            color: theme.colorScheme.primary,
-                          )
-                        else
-                          Icon(
-                            Icons.circle_outlined,
-                            size: 16,
-                            color: theme.colorScheme.secondary,
+                        // Color dot
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: group.toFlutterColor(),
+                            shape: BoxShape.circle,
                           ),
-                        const SizedBox(width: 10),
+                        ),
+                        const SizedBox(width: 8),
 
                         // Group name and count
                         Expanded(
@@ -206,6 +216,16 @@ class _GroupsPanelState extends State<GroupsPanel> {
           ),
         ),
         PopupMenuItem<String>(
+          value: 'color',
+          child: const Row(
+            children: [
+              Icon(Icons.palette_outlined, size: 16),
+              SizedBox(width: 10),
+              Text('Change color'),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
           value: 'delete',
           child: const Row(
             children: [
@@ -221,6 +241,9 @@ class _GroupsPanelState extends State<GroupsPanel> {
     switch (result) {
       case 'rename':
         _showRenameDialog(context, group);
+        break;
+      case 'color':
+        _showColorPicker(context, group);
         break;
       case 'delete':
         _showDeleteConfirmDialog(context, group);
@@ -284,6 +307,44 @@ class _GroupsPanelState extends State<GroupsPanel> {
 
     if (confirm == true) {
       widget.onGroupDeleted(group);
+    }
+  }
+
+  Future<void> _showColorPicker(BuildContext context, Group group) async {
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Pick a color'),
+        content: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: kGroupColorPresets.map((hex) {
+            final color = Color(int.parse(hex.replaceFirst('#', '0xff')));
+            final isSelected = hex.toUpperCase() == group.color.toUpperCase();
+            return GestureDetector(
+              onTap: () => Navigator.pop(ctx, hex),
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  border: isSelected
+                      ? Border.all(color: Colors.white, width: 3)
+                      : null,
+                  boxShadow: isSelected
+                      ? [BoxShadow(color: color.withValues(alpha: 0.6), blurRadius: 4)]
+                      : null,
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+
+    if (picked != null) {
+      widget.onGroupColorChanged(group, picked);
     }
   }
 }
