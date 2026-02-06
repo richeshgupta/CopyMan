@@ -29,7 +29,9 @@ jobs:
             xdotool \
             x11-utils \
             xclip \
-            keybinder-3.0
+            keybinder-3.0 \
+            libappindicator3-1 \
+            libappindicator3-dev
 
       - name: Get dependencies
         run: |
