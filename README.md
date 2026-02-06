@@ -9,6 +9,8 @@ A lightweight, fast, and feature-rich clipboard manager for Linux, Windows, and 
 
 **Status:** ✅ Phase 2 Complete | **License:** MIT | **Built with:** Flutter 3.38.9
 
+⚠️ **Current Platform Support:** Linux only. macOS and Windows support coming soon.
+
 ---
 
 ## 📚 Documentation
@@ -60,7 +62,30 @@ CopyMan is open source and welcomes contributions!
 
 - **Report Issues:** [GitHub Issues](https://github.com/richeshgupta/CopyMan/issues)
 - **Suggest Features:** [GitHub Discussions](https://github.com/richeshgupta/CopyMan/discussions)
-- **Submit Code:** See [CONTRIBUTING](./CopyMan/CONTRIBUTING.md)
+- **Submit Code:** See [CONTRIBUTING](./CONTRIBUTING.md)
+
+---
+
+## 🗓️ Upcoming Plans
+
+### Next Milestones
+
+| Phase | Status | Features |
+|-------|--------|----------|
+| **Phase 2** | ✅ Complete | Keyboard-first UI, configurable shortcuts, groups, sequential paste |
+| **Phase 3** | 📋 Planned | macOS support (native clipboard APIs, system integration) |
+| **Phase 4** | 📋 Planned | Windows support (Win32 APIs, system integration) |
+| **Phase 5** | 📋 Future | Cross-device sync (LAN P2P, E2EE), cloud backup, mobile apps |
+
+### Current Focus
+- ✅ **Linux MVP** — Fully functional, keyboard-first, ready for daily use
+- 🔄 **macOS Expansion** — Native APIs for clipboard/hotkey/window management
+- 🔄 **Windows Expansion** — Win32 integration for seamless experience
+
+### Known Limitations (Linux v2.0)
+- ⚠️ **Image capture not implemented** — Text-only clipboard history
+- ⚠️ **No cross-device sync** — Data stays on this machine
+- ⚠️ **No cloud backup** — Local SQLite database only
 
 ---
 
