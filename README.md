@@ -19,7 +19,7 @@ A lightweight, fast, and feature-rich clipboard manager for Linux, Windows, and 
 
 | Document | Purpose |
 |----------|---------|
-| [**README**](./docs/README.md) | Project overview, features, quick start |
+| [**FEATURES & ARCHITECTURE**](./FEATURES_AND_ARCHITECTURE.md) | Complete feature list, tech stack, services, performance |
 | [**CONTRIBUTING**](./CONTRIBUTING.md) | Contribution guidelines & development setup |
 | [**DEVELOPMENT**](./docs/DEVELOPMENT.md) | Detailed development guide & architecture |
 | [**SECURITY**](./SECURITY.md) | Security policy & data handling |
@@ -28,7 +28,7 @@ A lightweight, fast, and feature-rich clipboard manager for Linux, Windows, and 
 
 ### Getting Started
 
-1. **New User?** Start with [CopyMan README](./docs/README.md) for features and quick start
+1. **New User?** Start with [FEATURES & ARCHITECTURE](./FEATURES_AND_ARCHITECTURE.md) for complete feature list and quick start
 2. **Want to Contribute?** Read [CONTRIBUTING](./CONTRIBUTING.md) for setup & guidelines
 3. **Developer?** See [DEVELOPMENT](./docs/DEVELOPMENT.md) for architecture & dev workflow
 4. **Have a Security Concern?** Check [SECURITY](./SECURITY.md) for reporting process
