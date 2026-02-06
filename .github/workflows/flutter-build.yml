@@ -28,7 +28,8 @@ jobs:
             libsqlite3-dev \
             xdotool \
             x11-utils \
-            xclip
+            xclip \
+            keybinder-3.0
 
       - name: Get dependencies
         run: |
