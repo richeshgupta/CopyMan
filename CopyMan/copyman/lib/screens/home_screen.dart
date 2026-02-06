@@ -10,13 +10,12 @@ import '../models/group.dart';
 import '../services/clipboard_service.dart';
 import '../services/fuzzy_search.dart';
 import '../services/group_service.dart';
+import '../services/hotkey_config_service.dart';
 import '../services/hotkey_service.dart';
 import '../services/sequence_service.dart';
 import '../services/storage_service.dart';
-import '../app.dart';
-import '../screens/settings_screen.dart';
 import '../widgets/clipboard_item_tile.dart';
-import '../widgets/groups_panel.dart';
+import '../widgets/group_filter_chips.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -29,28 +28,34 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   // ── focus & controllers ───────────────────────────────────────
   final FocusNode _searchFocus = FocusNode();
   final TextEditingController _searchCtrl = TextEditingController();
+  final ScrollController _scrollCtrl = ScrollController();
 
   // ── services ──────────────────────────────────────────────────
   late final HotkeyService _hotkeyService;
   final ClipboardService _clipService = ClipboardService();
   StreamSubscription<int>? _clipSub;
+  final _config = HotkeyConfigService.instance;
 
   // ── state ─────────────────────────────────────────────────────
   List<ClipboardItem> _allItems = [];
   List<FuzzyMatch> _matches = [];
   int _selectedIndex = 0;
+  // ignore: unused_field
   bool _hotkeyOk = false;
-  bool _hiding = false; // guard against re-entrant hide calls
+  bool _hiding = false;
+  bool _inSettings = false;
 
   // ── groups ────────────────────────────────────────────────────
   List<Group> _groups = [];
-  int? _selectedGroupId; // null = "All Items"
-  Map<int, int> _groupCounts = {}; // group id -> item count
-  bool _sidebarVisible = true; // collapsible sidebar
+  int? _selectedGroupId;
 
   // ── multi-select & sequence ───────────────────────────────────
-  List<bool> _itemSelected = []; // Track which items are selected
+  List<bool> _itemSelected = [];
   final SequenceService _sequenceService = SequenceService();
+
+  // ── preview overlay ───────────────────────────────────────────
+  bool _previewVisible = false;
+  OverlayEntry? _previewOverlay;
 
   @override
   void initState() {
@@ -77,6 +82,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
 
   @override
   void dispose() {
+    _removePreviewOverlay();
     HardwareKeyboard.instance.removeHandler(_onKey);
     _clipSub?.cancel();
     _clipService.dispose();
@@ -84,6 +90,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     windowManager.removeListener(this);
     _searchCtrl.dispose();
     _searchFocus.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
@@ -93,11 +100,26 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     if (event is! KeyDownEvent) return false;
     if (!_searchFocus.hasFocus) return false;
 
-    final isCtrl = HardwareKeyboard.instance.isControlPressed;
-    final isShift = HardwareKeyboard.instance.isShiftPressed;
+    // Ctrl+V while in sequence mode: Advance to next item
+    if (_config.matches(AppAction.copyAndPaste, event) &&
+        _sequenceService.isActive) {
+      // Special: in sequence mode, Ctrl+V advances
+      _advanceSequence();
+      return true;
+    }
 
-    // Ctrl+A: Toggle select all
-    if (event.logicalKey == LogicalKeyboardKey.keyA && isCtrl && !isShift) {
+    // Space key: toggle preview only if search is empty or cursor at end
+    if (_config.matches(AppAction.togglePreview, event)) {
+      final text = _searchCtrl.text;
+      final sel = _searchCtrl.selection;
+      if (text.isEmpty || (sel.isValid && sel.baseOffset >= text.length)) {
+        _togglePreview();
+        return true;
+      }
+      return false; // Let space type normally
+    }
+
+    if (_config.matches(AppAction.selectAll, event)) {
       setState(() {
         final allSelected = _itemSelected.every((x) => x);
         for (int i = 0; i < _itemSelected.length; i++) {
@@ -107,55 +129,183 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
       return true;
     }
 
-    // Ctrl+Shift+S: Start sequence
-    if (event.logicalKey == LogicalKeyboardKey.keyS && isCtrl && isShift) {
+    if (_config.matches(AppAction.startSequence, event)) {
       _startSequence();
       return true;
     }
 
-    // Ctrl+V while in sequence mode: Advance to next item
-    if (event.logicalKey == LogicalKeyboardKey.keyV &&
-        isCtrl &&
-        _sequenceService.isActive) {
-      _advanceSequence();
+    if (_config.matches(AppAction.moveDown, event)) {
+      _removePreviewOverlay();
+      setState(() {
+        if (_selectedIndex < _matches.length - 1) _selectedIndex++;
+      });
+      _scrollToSelected();
       return true;
     }
 
-    switch (event.logicalKey) {
-      case LogicalKeyboardKey.arrowDown:
-        setState(() {
-          if (_selectedIndex < _matches.length - 1) _selectedIndex++;
-        });
-        return true;
+    if (_config.matches(AppAction.moveUp, event)) {
+      _removePreviewOverlay();
+      setState(() {
+        if (_selectedIndex > 0) _selectedIndex--;
+      });
+      _scrollToSelected();
+      return true;
+    }
 
-      case LogicalKeyboardKey.arrowUp:
-        setState(() {
-          if (_selectedIndex > 0) _selectedIndex--;
-        });
-        return true;
+    if (_config.matches(AppAction.pastePlain, event)) {
+      if (_selectedIndex >= 0 && _selectedIndex < _matches.length) {
+        _pasteAsPlain(_matches[_selectedIndex].item);
+      }
+      return true;
+    }
 
-      case LogicalKeyboardKey.enter:
-        if (_selectedIndex >= 0 && _selectedIndex < _matches.length) {
-          if (isCtrl && isShift) {
-            _pasteAsPlain(_matches[_selectedIndex].item);
-          } else if (isCtrl) {
-            _copyAndPaste(_matches[_selectedIndex].item);
-          } else {
-            _copyItem(_matches[_selectedIndex].item);
-          }
-        }
-        return true;
+    if (_config.matches(AppAction.copyAndPaste, event)) {
+      if (_selectedIndex >= 0 && _selectedIndex < _matches.length) {
+        _copyAndPaste(_matches[_selectedIndex].item);
+      }
+      return true;
+    }
 
-      case LogicalKeyboardKey.escape:
-        if (_sequenceService.isActive) {
-          setState(() => _sequenceService.cancel());
-        } else {
-          _hideWindow();
-        }
-        return true;
+    if (_config.matches(AppAction.copy, event)) {
+      if (_selectedIndex >= 0 && _selectedIndex < _matches.length) {
+        _copyItem(_matches[_selectedIndex].item);
+      }
+      return true;
+    }
 
-      default:
-        return false;
+    if (_config.matches(AppAction.close, event)) {
+      if (_previewVisible) {
+        _removePreviewOverlay();
+        return true;
+      }
+      if (_sequenceService.isActive) {
+        setState(() => _sequenceService.cancel());
+      } else {
+        _hideWindow();
+      }
+      return true;
+    }
+
+    if (_config.matches(AppAction.togglePin, event)) {
+      if (_selectedIndex >= 0 && _selectedIndex < _matches.length) {
+        _togglePin(_matches[_selectedIndex].item);
+      }
+      return true;
+    }
+
+    if (_config.matches(AppAction.deleteItem, event)) {
+      if (_selectedIndex >= 0 && _selectedIndex < _matches.length) {
+        _deleteItem(_matches[_selectedIndex].item);
+      }
+      return true;
+    }
+
+    if (_config.matches(AppAction.openSettings, event)) {
+      _openSettings();
+      return true;
+    }
+
+    return false;
+  }
+
+  void _scrollToSelected() {
+    // Approximate item height ~30px
+    final targetOffset = _selectedIndex * 30.0;
+    if (_scrollCtrl.hasClients) {
+      final viewportHeight = _scrollCtrl.position.viewportDimension;
+      final currentOffset = _scrollCtrl.offset;
+      if (targetOffset < currentOffset) {
+        _scrollCtrl.jumpTo(targetOffset);
+      } else if (targetOffset > currentOffset + viewportHeight - 30) {
+        _scrollCtrl.jumpTo(targetOffset - viewportHeight + 30);
+      }
+    }
+  }
+
+  // ── preview overlay ─────────────────────────────────────────
+
+  void _togglePreview() {
+    if (_previewVisible) {
+      _removePreviewOverlay();
+    } else {
+      _showPreviewOverlay();
+    }
+  }
+
+  void _showPreviewOverlay() {
+    if (_matches.isEmpty || _selectedIndex >= _matches.length) return;
+    _removePreviewOverlay();
+
+    final item = _matches[_selectedIndex].item;
+    final overlay = Overlay.of(context);
+
+    _previewOverlay = OverlayEntry(
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return Positioned(
+          left: 40,
+          right: 40,
+          top: 100,
+          child: Material(
+            elevation: 8,
+            borderRadius: BorderRadius.circular(8),
+            color: theme.colorScheme.surface,
+            child: Container(
+              constraints: const BoxConstraints(maxHeight: 200),
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${item.content.length} chars',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: theme.colorScheme.secondary,
+                        ),
+                      ),
+                      Text(
+                        item.relativeTime,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: theme.colorScheme.secondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Text(
+                        item.content,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurface,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    overlay.insert(_previewOverlay!);
+    setState(() => _previewVisible = true);
+  }
+
+  void _removePreviewOverlay() {
+    _previewOverlay?.remove();
+    _previewOverlay = null;
+    if (_previewVisible && mounted) {
+      setState(() => _previewVisible = false);
     }
   }
 
@@ -171,27 +321,20 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   }
 
   Future<void> _showWindow() async {
-    // Show window
     await windowManager.show();
 
-    // X11-specific: Force window to front using always-on-top toggle
-    // This bypasses many WM focus policies more reliably than direct focus calls
     if (Platform.isLinux) {
       await windowManager.setAlwaysOnTop(true);
       await Future.delayed(const Duration(milliseconds: 50));
       await windowManager.focus();
       await Future.delayed(const Duration(milliseconds: 50));
-      // Release always-on-top after gaining focus
       await windowManager.setAlwaysOnTop(false);
     } else {
-      // macOS / Windows
       await windowManager.focus();
     }
 
-    // Load clipboard history
     _loadItems();
 
-    // Focus the search field for keyboard input
     await Future.delayed(const Duration(milliseconds: 30));
     _searchCtrl.clear();
     _searchFocus.unfocus();
@@ -201,6 +344,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   Future<void> _hideWindow() async {
     if (_hiding) return;
     _hiding = true;
+    _removePreviewOverlay();
     _searchFocus.unfocus();
     _searchCtrl.clear();
     if (mounted) setState(() => _selectedIndex = 0);
@@ -210,7 +354,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
 
   @override
   Future<void> onWindowEvent(String eventName) async {
-    if (eventName == 'blur') {
+    if (eventName == 'blur' && !_inSettings) {
       _hideWindow();
     }
   }
@@ -219,16 +363,9 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
 
   Future<void> _loadGroups() async {
     final groups = await GroupService.instance.fetchAllGroups();
-    final counts = <int, int>{};
-    for (final group in groups) {
-      counts[group.id] = await GroupService.instance.getGroupItemCount(group.id);
-    }
-
     if (mounted) {
       setState(() {
         _groups = groups;
-        _groupCounts = counts;
-        _itemSelected = List.filled(_matches.length, false);
       });
     }
   }
@@ -236,20 +373,16 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   Future<void> _loadItems() async {
     final q = _searchCtrl.text.trim();
 
-    // Fetch items: all if no group selected, or specific group
     List<ClipboardItem> items;
     if (_selectedGroupId == null) {
-      // All items
       items = await StorageService.instance.fetchItems();
     } else {
-      // Items in selected group
       items = await GroupService.instance.fetchItemsInGroup(_selectedGroupId!);
     }
 
     if (mounted) {
       setState(() {
         _allItems = items;
-        // Apply fuzzy search
         _matches = q.isEmpty
             ? items
                 .map((item) =>
@@ -257,7 +390,6 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
                 .toList()
             : FuzzySearch.search(q, items);
         if (_selectedIndex >= _matches.length) _selectedIndex = 0;
-        // Reset multi-select on reload
         _itemSelected = List.filled(_matches.length, false);
       });
     }
@@ -275,32 +407,24 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     _clipService.setLastContent(item.content);
     await Clipboard.setData(ClipboardData(text: item.content));
     await _hideWindow();
-    // Give the OS a moment to restore focus to the previous window.
     await Future.delayed(const Duration(milliseconds: 80));
     try {
       if (Platform.isLinux) {
         await Process.run('xdotool', ['key', 'ctrl+v']);
       }
-      // Windows / macOS paste simulation — TODO
-    } catch (_) {
-      // xdotool not available; clipboard is set, user can Ctrl+V manually.
-    }
+    } catch (_) {}
   }
 
   Future<void> _pasteAsPlain(ClipboardItem item) async {
     _clipService.setLastContent(item.content);
     await Clipboard.setData(ClipboardData(text: item.content));
     await _hideWindow();
-    // Give the OS a moment to restore focus to the previous window.
     await Future.delayed(const Duration(milliseconds: 80));
     try {
       if (Platform.isLinux) {
         await Process.run('xdotool', ['key', 'ctrl+shift+v']);
       }
-      // Windows / macOS paste simulation — TODO
-    } catch (_) {
-      // xdotool not available; clipboard is set, user can Ctrl+V manually.
-    }
+    } catch (_) {}
   }
 
   Future<void> _togglePin(ClipboardItem item) async {
@@ -313,39 +437,10 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     await _loadItems();
   }
 
-  Future<void> _deleteAll() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete all history?'),
-        content: const Text(
-            'This permanently removes every item, including pinned ones.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style:
-                TextButton.styleFrom(foregroundColor: Theme.of(ctx).colorScheme.error),
-            child: const Text('Delete all'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true) {
-      await StorageService.instance.deleteAll();
-      _loadItems();
-    }
-  }
-
   // ── groups ─────────────────────────────────────────────────────
 
   Future<void> _onGroupSelected(int? groupId) async {
-    setState(() {
-      _selectedGroupId = groupId;
-    });
+    setState(() => _selectedGroupId = groupId);
     await _loadItems();
   }
 
@@ -377,13 +472,12 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
       try {
         await GroupService.instance.createGroup(name);
         await _loadGroups();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Group created: $name')),
-        );
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: ${e.toString()}')),
+          );
+        }
       }
     }
     controller.dispose();
@@ -393,13 +487,12 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     try {
       await GroupService.instance.updateGroup(group.id, name: group.name);
       await _loadGroups();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Group renamed: ${group.name}')),
-      );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
     }
   }
 
@@ -408,13 +501,12 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
       await GroupService.instance.deleteGroup(group.id, moveToGroupId: 1);
       await _loadGroups();
       await _loadItems();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Group deleted: ${group.name}')),
-      );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
     }
   }
 
@@ -422,24 +514,18 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     try {
       await GroupService.instance.updateGroup(group.id, color: color);
       await _loadGroups();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
-      );
-    }
+    } catch (_) {}
   }
 
   Future<void> _openSettings() async {
-    final appState = context.findAncestorStateOfType<CopyManAppState>();
-    await showDialog(
-      context: context,
-      builder: (ctx) => SettingsScreen(
-        currentThemeMode: appState?.themeModeString ?? 'system',
-        onThemeModeChanged: (mode) {
-          appState?.setThemeMode(mode);
-        },
-      ),
-    );
+    _inSettings = true;
+    await Navigator.pushNamed(context, '/settings');
+    _inSettings = false;
+    // Reload in case hotkey changed
+    await _hotkeyService.reregister().then((ok) {
+      if (mounted) setState(() => _hotkeyOk = ok);
+    });
+    _searchFocus.requestFocus();
   }
 
   Future<void> _onMoveToGroup(ClipboardItem item) async {
@@ -462,9 +548,6 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
       await GroupService.instance.moveItemToGroup(item.id, selectedGroup);
       await _loadGroups();
       await _loadItems();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Item moved')),
-      );
     }
   }
 
@@ -490,7 +573,6 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     setState(() {
       _sequenceService.startSequence(selectedItems);
       _itemSelected = List.filled(_matches.length, false);
-      // Set clipboard to first item
       _clipService.setLastContent(selectedItems[0].content);
       Clipboard.setData(ClipboardData(text: selectedItems[0].content));
     });
@@ -503,9 +585,8 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     if (item != null) {
       _clipService.setLastContent(item.content);
       await Clipboard.setData(ClipboardData(text: item.content));
-      setState(() {}); // Refresh UI to show new progress
+      setState(() {});
     } else {
-      // Sequence complete
       setState(() => _sequenceService.cancel());
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -520,17 +601,75 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final pinnedCount = _allItems.where((i) => i.pinned).length;
+    final showChips = _groups.length > 1;
+    final hasPinned = _matches.any((m) => m.item.pinned);
+
+    // Split into pinned and unpinned
+    final pinnedMatches = _matches.where((m) => m.item.pinned).toList();
+    // unpinnedMatches used implicitly via _matches ordering
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: Row(
+      body: Column(
         children: [
-          // ── groups sidebar (collapsible) ─────────────────────
-          if (_sidebarVisible && _groups.isNotEmpty)
-            SizedBox(
-              width: 140,
-              child: GroupsPanel(
+          // ── search bar ──────────────────────────────────────
+          Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              border: Border(bottom: BorderSide(color: theme.dividerColor)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.search, size: 18, color: theme.colorScheme.secondary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: TextField(
+                    focusNode: _searchFocus,
+                    controller: _searchCtrl,
+                    autofocus: false,
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurface,
+                      fontSize: 14,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Search clipboard...',
+                      hintStyle: TextStyle(color: theme.colorScheme.secondary),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                      isDense: true,
+                      suffixIcon: _searchCtrl.text.isNotEmpty
+                          ? IconButton(
+                              icon: Icon(Icons.close, size: 14, color: theme.colorScheme.secondary),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: () => _searchCtrl.clear(),
+                            )
+                          : null,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.settings_outlined, size: 16,
+                      color: theme.colorScheme.secondary),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: _openSettings,
+                  tooltip: 'Settings',
+                ),
+              ],
+            ),
+          ),
+
+          // ── group filter chips ──────────────────────────────
+          if (showChips)
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                border: Border(bottom: BorderSide(color: theme.dividerColor)),
+              ),
+              child: GroupFilterChips(
                 groups: _groups,
                 selectedGroupId: _selectedGroupId,
                 onGroupSelected: _onGroupSelected,
@@ -538,168 +677,8 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
                 onGroupRenamed: _onGroupRenamed,
                 onGroupDeleted: _onGroupDeleted,
                 onGroupColorChanged: _onGroupColorChanged,
-                groupCounts: _groupCounts,
               ),
             ),
-
-          // ── main content ────────────────────────────────────
-          Expanded(
-            child: Column(
-              children: [
-          // ── search bar + sidebar toggle ─────────────────────
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              border: Border(bottom: BorderSide(color: theme.dividerColor)),
-            ),
-            child: Row(
-              children: [
-                if (_groups.isNotEmpty)
-                  IconButton(
-                    icon: Icon(
-                      _sidebarVisible ? Icons.menu_open : Icons.menu,
-                      size: 18,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    onPressed: () => setState(() => _sidebarVisible = !_sidebarVisible),
-                    tooltip: 'Toggle sidebar',
-                  ),
-                IconButton(
-                  icon: Icon(Icons.settings_outlined, size: 18,
-                      color: theme.colorScheme.secondary),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  onPressed: _openSettings,
-                  tooltip: 'Settings',
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: TextField(
-              focusNode: _searchFocus,
-              controller: _searchCtrl,
-              autofocus: false,
-              style: TextStyle(
-                color: theme.colorScheme.onSurface,
-                fontSize: 14,
-              ),
-              decoration: InputDecoration(
-                hintText: 'Search clipboard…',
-                hintStyle: TextStyle(color: theme.colorScheme.secondary),
-                prefixIcon:
-                    Icon(Icons.search, size: 18, color: theme.colorScheme.secondary),
-                suffixIcon: _searchCtrl.text.isNotEmpty
-                    ? IconButton(
-                        icon: Icon(Icons.close, size: 16, color: theme.colorScheme.secondary),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        onPressed: () => _searchCtrl.clear(),
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: theme.dividerColor),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: theme.colorScheme.primary),
-                ),
-                filled: true,
-                fillColor: theme.colorScheme.surface,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                isDense: true,
-              ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // ── sequence mode indicator (if active) ────────────
-          if (_sequenceService.isActive)
-            Container(
-              color: theme.colorScheme.primary.withValues(alpha: 0.15),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Sequence Mode: ${_sequenceService.progress}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, size: 16),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    onPressed: () {
-                      setState(() => _sequenceService.cancel());
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-          // ── info & multi-select strip ──────────────────────
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-            color: theme.colorScheme.surface,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    _itemSelected.any((x) => x)
-                        ? '${_itemSelected.where((x) => x).length} selected'
-                        : '${_allItems.length} item${_allItems.length != 1 ? 's' : ''}'
-                            '${pinnedCount > 0 ? ' · $pinnedCount pinned' : ''}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: theme.colorScheme.secondary,
-                    ),
-                  ),
-                ),
-                if (_itemSelected.any((x) => x) && !_sequenceService.isActive)
-                  Row(
-                    children: [
-                      TextButton.icon(
-                        onPressed: _startSequence,
-                        icon: const Icon(Icons.repeat, size: 14),
-                        label: const Text('Sequence'),
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _itemSelected = List.filled(_matches.length, false);
-                          });
-                        },
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        child: const Text('Clear'),
-                      ),
-                    ],
-                  )
-                else if (!_hotkeyOk)
-                  Text(
-                    'Hotkey not registered',
-                    style:
-                        TextStyle(fontSize: 11, color: theme.colorScheme.error),
-                  ),
-              ],
-            ),
-          ),
 
           // ── item list ───────────────────────────────────────
           Expanded(
@@ -717,32 +696,56 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
                     ),
                   )
                 : ListView.builder(
-                    itemCount: _matches.length,
+                    controller: _scrollCtrl,
+                    itemCount: _matches.length + (hasPinned ? 1 : 0),
                     itemBuilder: (ctx, i) {
-                      final match = _matches[i];
+                      // Insert divider between pinned and unpinned
+                      if (hasPinned && i == pinnedMatches.length) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                          child: Row(
+                            children: List.generate(
+                              20,
+                              (_) => Expanded(
+                                child: Container(
+                                  margin: const EdgeInsets.symmetric(horizontal: 1),
+                                  height: 1,
+                                  color: theme.dividerColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+
+                      final matchIdx = hasPinned && i > pinnedMatches.length
+                          ? i - 1
+                          : i;
+                      if (matchIdx >= _matches.length) return const SizedBox();
+
+                      final match = _matches[matchIdx];
                       final isInMultiSelectMode = _itemSelected.any((x) => x);
 
-                      // Multi-select via Ctrl+Click
                       return GestureDetector(
                         onLongPress: () {
                           setState(() {
-                            _itemSelected[i] = !_itemSelected[i];
+                            _itemSelected[matchIdx] = !_itemSelected[matchIdx];
                           });
                         },
                         child: ClipboardItemTile(
                           item: match.item,
-                          isSelected: i == _selectedIndex,
+                          isSelected: matchIdx == _selectedIndex,
                           matchIndices: match.matchIndices,
                           isMultiSelectMode: isInMultiSelectMode,
-                          isCheckboxChecked: _itemSelected[i],
+                          isCheckboxChecked: _itemSelected[matchIdx],
                           onCheckboxChanged: (checked) {
-                            setState(() => _itemSelected[i] = checked);
+                            setState(() => _itemSelected[matchIdx] = checked);
                           },
                           onTap: () {
                             if (isInMultiSelectMode) {
-                              setState(() => _itemSelected[i] = !_itemSelected[i]);
+                              setState(() => _itemSelected[matchIdx] = !_itemSelected[matchIdx]);
                             } else {
-                              setState(() => _selectedIndex = i);
+                              setState(() => _selectedIndex = matchIdx);
                               _copyItem(match.item);
                             }
                           },
@@ -757,77 +760,47 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
                   ),
           ),
 
-          // ── preview pane ─────────────────────────────────────
-          if (_matches.isNotEmpty)
+          // ── status bar ──────────────────────────────────────
+          if (_allItems.isNotEmpty || _sequenceService.isActive)
             Container(
+              height: 20,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
                 border: Border(top: BorderSide(color: theme.dividerColor)),
               ),
-              constraints: const BoxConstraints(maxHeight: 120),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    child: Text(
-                      'Preview',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: theme.colorScheme.secondary,
-                      ),
+                  Text(
+                    '${_allItems.length} item${_allItems.length != 1 ? 's' : ''}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: theme.colorScheme.secondary,
                     ),
                   ),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        child: Text(
-                          _matches[_selectedIndex].item.content,
+                  if (_sequenceService.isActive)
+                    Row(
+                      children: [
+                        Text(
+                          'Seq ${_sequenceService.progress}',
                           style: TextStyle(
-                            fontSize: 12,
-                            color: theme.colorScheme.onSurface,
-                            height: 1.4,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.primary,
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 4),
+                        GestureDetector(
+                          onTap: () => setState(() => _sequenceService.cancel()),
+                          child: Icon(Icons.close, size: 12,
+                              color: theme.colorScheme.secondary),
+                        ),
+                      ],
                     ),
-                  ),
                 ],
               ),
             ),
-
-          // ── bottom bar ──────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              border: Border(top: BorderSide(color: theme.dividerColor)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Enter copy · Ctrl+Shift+Enter plain · Ctrl+Enter paste · Esc close',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: theme.colorScheme.secondary,
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.delete_outline, size: 16,
-                      color: theme.colorScheme.secondary),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  onPressed: _deleteAll,
-                  tooltip: 'Clear all',
-                ),
-              ],
-            ),
-          ),
-              ], // Close children list of Column
-            ), // Close Column
-          ), // Close Expanded (main content)
         ],
       ),
     );

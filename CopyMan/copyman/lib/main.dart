@@ -7,6 +7,7 @@ import 'package:hotkey_manager/hotkey_manager.dart';
 
 import 'app.dart';
 import 'services/storage_service.dart';
+import 'services/hotkey_config_service.dart';
 import 'services/tray_service.dart';
 
 late TrayService _trayService;
@@ -20,6 +21,7 @@ void main() async {
     databaseFactory = databaseFactoryFfi;
   }
   await StorageService.instance.init();
+  await HotkeyConfigService.instance.init();
 
   // ── window manager ────────────────────────────────────────────
   await windowManager.ensureInitialized();
@@ -27,7 +29,7 @@ void main() async {
 
   windowManager.waitUntilReadyToShow(
     const WindowOptions(
-      size: Size(420, 580),
+      size: Size(380, 480),
       center: true,
       skipTaskbar: true,
       alwaysOnTop: true,

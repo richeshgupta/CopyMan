@@ -11,13 +11,22 @@ class AppTheme {
       secondary: const Color(0xFF6B7280),
       error: const Color(0xFFEF4444),
     ),
-    scaffoldBackgroundColor: const Color(0xFFF3F4F6),
+    scaffoldBackgroundColor: Colors.white,
     cardTheme: CardThemeData(
       color: Colors.white,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: const BorderSide(color: Color(0xFFE5E7EB)),
+      ),
+    ),
+    chipTheme: ChipThemeData(
+      backgroundColor: const Color(0xFFF3F4F6),
+      selectedColor: const Color(0xFF6366F1),
+      labelStyle: const TextStyle(fontSize: 11),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
       ),
     ),
     dividerColor: const Color(0xFFE5E7EB),
@@ -34,13 +43,22 @@ class AppTheme {
       secondary: const Color(0xFF94A3B8),
       error: const Color(0xFFF87171),
     ),
-    scaffoldBackgroundColor: const Color(0xFF12121F),
+    scaffoldBackgroundColor: const Color(0xFF1E1E2E),
     cardTheme: CardThemeData(
       color: const Color(0xFF1E1E2E),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: const BorderSide(color: Color(0xFF2D2D3F)),
+      ),
+    ),
+    chipTheme: ChipThemeData(
+      backgroundColor: const Color(0xFF2D2D3F),
+      selectedColor: const Color(0xFF818CF8),
+      labelStyle: const TextStyle(fontSize: 11),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
       ),
     ),
     dividerColor: const Color(0xFF2D2D3F),

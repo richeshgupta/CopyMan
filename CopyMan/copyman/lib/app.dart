@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'screens/home_screen.dart';
+import 'screens/settings_screen.dart';
 import 'services/storage_service.dart';
 import 'theme/app_theme.dart';
 
@@ -66,7 +67,25 @@ class CopyManAppState extends State<CopyManApp> {
       themeMode: _themeMode,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      home: const HomeScreen(),
+      initialRoute: '/',
+      onGenerateRoute: (settings) {
+        switch (settings.name) {
+          case '/settings':
+            final appState = this;
+            return MaterialPageRoute(
+              builder: (_) => SettingsScreen(
+                currentThemeMode: appState.themeModeString,
+                onThemeModeChanged: (mode) {
+                  appState.setThemeMode(mode);
+                },
+              ),
+            );
+          default:
+            return MaterialPageRoute(
+              builder: (_) => const HomeScreen(),
+            );
+        }
+      },
     );
   }
 }
