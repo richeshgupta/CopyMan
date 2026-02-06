@@ -1,8 +1,10 @@
-# CopyMan — Cross-Platform Clipboard Manager
+# CopyMan — Features & Architecture
 
 A lightweight, fast, and feature-rich clipboard manager for Linux, Windows, and macOS. Built with Flutter for a native desktop experience.
 
 **Status:** ✅ Phase 2 Complete | **License:** MIT | **Built with:** Flutter 3.38.9
+
+⚠️ **Current Platform Support:** Linux only. macOS and Windows support coming soon.
 
 ---
 
@@ -24,6 +26,7 @@ CopyMan is a smart clipboard manager that captures every text you copy, lets you
 | **🎨 Dark & Light Themes** | Automatic theme switching based on system preference |
 | **🪟 System Tray** | Quick access from system tray • Minimize to tray |
 | **⌨️ Global Hotkey** | Show/hide with Ctrl+Alt+V • Always accessible |
+| **⚙️ Configurable Shortcuts** | Customize all keyboard shortcuts to your preference |
 
 ## 🚀 Quick Start
 
@@ -31,13 +34,13 @@ CopyMan is a smart clipboard manager that captures every text you copy, lets you
 
 - **Flutter 3.38.9+** with Dart 3.10.8+
 - **Linux:** GTK 3.0+, libsqlite3-dev, xdotool, xprop
-- **macOS:** Xcode command-line tools
-- **Windows:** Visual Studio Build Tools or MinGW
+- **macOS:** Xcode command-line tools (coming soon)
+- **Windows:** Visual Studio Build Tools or MinGW (coming soon)
 
 ### Installation
 
 ```bash
-cd CopyMan/copyman
+cd copyman
 flutter pub get
 flutter build linux --release
 ```
@@ -70,65 +73,81 @@ flutter run -d linux
 | **Escape** | Close popup / Cancel sequence |
 | **Right-click** | Context menu (pin, move to group, delete) |
 | **Long-press** | Toggle multi-select on item |
+| **Ctrl+P** | Pin/unpin selected item |
+| **Delete** | Delete selected item |
+| **Ctrl+,** | Open settings |
+| **Space** | Preview selected item (overlay) |
 
-## 📊 Roadmap
+*All shortcuts are customizable in Settings → Shortcuts*
+
+## 📊 Feature Roadmap
 
 | Phase | Status | Features |
 |-------|--------|----------|
 | **Phase 1** | ✅ Complete | Clipboard history, fuzzy search, pinning, app exclusions, system tray, hotkey, themes |
-| **Phase 2** | ✅ Complete | Groups/folders, sequential paste mode, multi-select, responsive UI |
-| **Phase 2.1** | 📋 Planned | Group colors, settings screen, app exclusion editor, auto-cleanup |
-| **Phase 3** | 📋 Planned | LAN P2P sync, zero-knowledge relay, E2EE, device pairing |
-| **Post-1.0** | 📋 Future | Image capture, mobile apps, managed relay, scripting engine |
+| **Phase 2** | ✅ Complete | Groups/folders, sequential paste mode, multi-select, responsive UI, configurable shortcuts |
+| **Phase 3** | 📋 Planned | macOS native support (Cocoa APIs), enhanced performance |
+| **Phase 4** | 📋 Planned | Windows native support (Win32 APIs), system integration |
+| **Phase 5** | 📋 Future | LAN P2P sync, zero-knowledge relay, E2EE, device pairing, image capture |
 
 ## 📁 Project Structure
 
 ```
-CopyMan/
+.
 ├── copyman/                        (Flutter application)
 │   ├── lib/
 │   │   ├── models/                 (Data models: ClipboardItem, Group, SequenceSession)
 │   │   ├── services/               (Business logic: Storage, Clipboard, Hotkey, etc.)
-│   │   ├── screens/                (UI screens: HomeScreen)
-│   │   ├── widgets/                (UI components: ItemTile, GroupsPanel)
+│   │   ├── screens/                (UI screens: HomeScreen, SettingsScreen)
+│   │   ├── widgets/                (UI components: ItemTile, GroupsPanel, etc.)
 │   │   ├── theme/                  (Light/dark themes)
 │   │   ├── main.dart               (Entry point)
 │   │   └── app.dart                (MaterialApp config)
 │   ├── pubspec.yaml                (Dependencies & metadata)
-│   ├── README.md                   (Detailed documentation)
 │   ├── linux/                      (Linux platform config)
 │   ├── windows/                    (Windows platform config)
 │   ├── macos/                      (macOS platform config)
 │   └── build/                      (Build artifacts)
 ├── docs/                           (Documentation & guides)
-├── PHASE-1-COMPLETION.md           (Phase 1 summary)
-├── PHASE-2-COMPLETION.md           (Phase 2 summary)
-└── RENAME-VERIFICATION.md          (Rename details)
+├── .github/                        (GitHub config & CI/CD workflows)
+├── FEATURES_AND_ARCHITECTURE.md    (This file)
+├── DEVELOPMENT.md                  (Development guide)
+├── CONTRIBUTING.md                 (Contribution guidelines)
+└── LICENSE                         (MIT License)
 ```
 
 ## 🏗️ Architecture
 
 ### Tech Stack
 
-- **UI:** Flutter (Material Design 3)
-- **Database:** SQLite 3 (sqflite_ffi)
-- **Clipboard:** xclip (Linux), native APIs (macOS/Windows)
+- **UI:** Flutter (Material Design 3) + Dart
+- **Database:** SQLite 3 (sqflite_common_ffi)
+- **Clipboard:** xclip (Linux), native APIs (macOS/Windows - TBD)
 - **Hotkey:** hotkey_manager + HardwareKeyboard
 - **Window:** window_manager
 - **Tray:** tray_manager
+- **Search:** Custom fuzzy search implementation
 
-### Services
+### Core Services
 
-| Service | Purpose |
-|---------|---------|
-| **StorageService** | SQLite CRUD, schema management, database migrations |
-| **ClipboardService** | Real-time clipboard monitoring (500ms polling) |
-| **HotKeyService** | Global hotkey registration & management |
-| **TrayService** | System tray icon & context menu |
-| **GroupService** | Group CRUD operations, item management |
-| **SequenceService** | Sequential paste session management |
-| **AppDetectionService** | Detect foreground app (for exclusions) |
-| **FuzzySearch** | In-memory fuzzy search with scoring |
+| Service | Purpose | File |
+|---------|---------|------|
+| **StorageService** | SQLite CRUD, schema management, database migrations | `services/storage_service.dart` |
+| **ClipboardService** | Real-time clipboard monitoring (500ms polling) | `services/clipboard_service.dart` |
+| **HotKeyService** | Global hotkey registration & management | `services/hotkey_service.dart` |
+| **HotKeyConfigService** | Persistent hotkey configuration & customization | `services/hotkey_config_service.dart` |
+| **TrayService** | System tray icon & context menu | `services/tray_service.dart` |
+| **GroupService** | Group CRUD operations, item management | `services/group_service.dart` |
+| **SequenceService** | Sequential paste session management | `services/sequence_service.dart` |
+| **AppDetectionService** | Detect foreground app (for exclusions) | `services/app_detection_service.dart` |
+| **FuzzySearch** | In-memory fuzzy search with scoring | `services/fuzzy_search.dart` |
+
+### Data Models
+
+- **ClipboardItem** — Individual clipboard entry with timestamp, content, groups
+- **Group** — Organization folder with metadata
+- **SequenceSession** — State for sequential paste mode
+- **HotkeyBinding** — Keyboard shortcut configuration
 
 ## 📊 Performance
 
@@ -145,37 +164,46 @@ CopyMan/
 #### Linux
 ```bash
 export PATH="$HOME/bin:$PATH"  # If using linker workaround
-cd CopyMan/copyman
+cd copyman
 flutter build linux --release
 ```
 
-#### macOS
+#### macOS (coming soon)
 ```bash
-cd CopyMan/copyman
+cd copyman
 flutter build macos --release
 ```
 
-#### Windows
+#### Windows (coming soon)
 ```bash
-cd CopyMan/copyman
+cd copyman
 flutter build windows --release
 ```
 
 ### Linting & Testing
 
 ```bash
+cd copyman
 flutter analyze lib/              # Code quality check
 flutter test                      # Unit tests
 ```
+
+### GitHub Actions CI/CD
+
+Automated checks run on every PR and push:
+- ✅ **flutter-analyze.yml** — Code quality checks
+- ✅ **flutter-test.yml** — Unit tests with coverage
+- ✅ **flutter-build.yml** — Build verification (Linux + Web)
 
 ## 🐛 Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
 | **Clipboard not capturing (Linux)** | Install: `sudo apt install xdotool x11-utils xclip` |
-| **Hotkey not working** | Check if another app uses Ctrl+Alt+V, or use system launcher |
+| **Hotkey not working** | Check if another app uses Ctrl+Alt+V, customize in Settings, or restart |
 | **Database locked** | Kill process: `pkill copyman` and remove DB: `rm ~/.local/share/copyman/copyman.db` |
-| **High memory usage** | Clear old items or reduce history limit (Phase 2.1) |
+| **High memory usage** | Clear old items in settings or reduce history retention limit |
+| **Build fails on Linux** | Ensure GTK dev packages installed: `sudo apt install libgtk-3-dev` |
 
 ## 🤝 Contributing
 
@@ -185,6 +213,8 @@ We welcome contributions! Here's how:
 2. **Suggest features:** [GitHub Discussions](https://github.com/richeshgupta/CopyMan/discussions)
 3. **Submit code:** Fork → Feature Branch → Pull Request
 
+See [CONTRIBUTING](./CONTRIBUTING.md) for detailed guidelines.
+
 ### Code Style
 
 - Follow [Effective Dart](https://dart.dev/guides/language/effective-dart)
@@ -193,7 +223,7 @@ We welcome contributions! Here's how:
 
 ## 📜 License
 
-MIT License — See [LICENSE](LICENSE) file for details.
+MIT License — See [LICENSE](./LICENSE) file for details.
 
 ## 👤 Credits
 
@@ -208,10 +238,8 @@ MIT License — See [LICENSE](LICENSE) file for details.
 - **Repository:** https://github.com/richeshgupta/CopyMan
 - **Issues:** https://github.com/richeshgupta/CopyMan/issues
 - **Discussions:** https://github.com/richeshgupta/CopyMan/discussions
-- **Detailed Docs:** [copyman/README.md](CopyMan/copyman/README.md)
+- **Development Guide:** [DEVELOPMENT.md](./docs/DEVELOPMENT.md)
 
 ---
 
 **CopyMan — Copy smarter. Paste faster.** ⚡
-
-For detailed documentation, see [copyman/README.md](CopyMan/copyman/README.md)

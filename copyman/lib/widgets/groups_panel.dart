@@ -25,6 +25,7 @@ class GroupsPanel extends StatefulWidget {
   final Map<int, int> groupCounts; // group id -> item count
 
   const GroupsPanel({
+    super.key,
     required this.groups,
     required this.selectedGroupId,
     required this.onGroupSelected,
@@ -237,6 +238,8 @@ class _GroupsPanelState extends State<GroupsPanel> {
         ),
       ],
     );
+
+    if (!context.mounted) return;
 
     switch (result) {
       case 'rename':

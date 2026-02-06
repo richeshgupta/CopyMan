@@ -28,9 +28,14 @@ jobs:
       - name: Run Flutter tests
         run: |
           cd copyman
-          flutter test --coverage
+          if [ -d test ]; then
+            flutter test --coverage
+          else
+            echo "No tests found yet. Skipping test run."
+          fi
 
       - name: Upload coverage to Codecov
+        if: always() && hashFiles('copyman/coverage/lcov.info') != ''
         uses: codecov/codecov-action@v3
         with:
           files: ./copyman/coverage/lcov.info
