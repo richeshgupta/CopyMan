@@ -1,0 +1,74 @@
+name: Flutter Build
+
+on:
+  push:
+    branches: [master, develop, '*.branch']
+  pull_request:
+    branches: [master, develop]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.9'
+          channel: 'stable'
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libsqlite3-dev \
+            xdotool \
+            x11-utils \
+            xclip
+
+      - name: Get dependencies
+        run: |
+          cd copyman
+          flutter pub get
+
+      - name: Build Linux release
+        run: |
+          cd copyman
+          flutter build linux --release
+
+      - name: Verify build artifact
+        run: |
+          test -f copyman/build/linux/x64/release/bundle/copyman || exit 1
+          echo "✓ Linux build successful"
+
+  build-web:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.9'
+          channel: 'stable'
+
+      - name: Get dependencies
+        run: |
+          cd copyman
+          flutter pub get
+
+      - name: Build web
+        run: |
+          cd copyman
+          flutter build web --release
+
+      - name: Verify build artifact
+        run: |
+          test -d copyman/build/web || exit 1
+          echo "✓ Web build successful"
