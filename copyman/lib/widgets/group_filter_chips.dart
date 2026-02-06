@@ -134,6 +134,8 @@ class GroupFilterChips extends StatelessWidget {
       ],
     );
 
+    if (!context.mounted) return;
+
     switch (result) {
       case 'rename':
         _showRenameDialog(context, group);
