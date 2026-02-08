@@ -35,6 +35,17 @@ class StorageService {
     _cachedHistoryLimit = await getHistoryLimit();
   }
 
+  /// Initialize with a custom path (use ':memory:' for tests).
+  Future<void> initForTest(String path) async {
+    _db = await openDatabase(
+      path,
+      version: 3,
+      onCreate: _createTables,
+      onUpgrade: _upgradeDatabase,
+    );
+    _cachedHistoryLimit = await getHistoryLimit();
+  }
+
   Future<void> _createTables(Database db, int version) async {
     // Create groups table
     await db.execute('''

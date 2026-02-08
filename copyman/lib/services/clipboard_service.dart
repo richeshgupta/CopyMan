@@ -60,6 +60,12 @@ class ClipboardService {
     _lastContent = content;
   }
 
+  /// For testing: expose the internal timer.
+  Timer? get timer => _timer;
+
+  /// For testing: trigger a poll manually.
+  Future<void> pollForTest() => _poll();
+
   void dispose() {
     stopMonitoring();
     onNewItem.close();

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 
 import 'storage_service.dart';
@@ -42,11 +44,11 @@ class HotkeyBinding {
 
   String describe() {
     final parts = <String>[];
-    if (ctrl) parts.add('Ctrl');
-    if (alt) parts.add('Alt');
-    if (shift) parts.add('Shift');
+    if (ctrl) parts.add(Platform.isMacOS ? '⌘' : 'Ctrl');
+    if (alt) parts.add(Platform.isMacOS ? '⌥' : 'Alt');
+    if (shift) parts.add(Platform.isMacOS ? '⇧' : 'Shift');
     parts.add(_keyLabel(key));
-    return parts.join('+');
+    return parts.join(Platform.isMacOS ? '' : '+');
   }
 
   @override
@@ -213,6 +215,11 @@ class HotkeyConfigService {
     _bindings[action] = binding;
     final settingKey = 'hotkey.${action.name}';
     await StorageService.instance.setSetting(settingKey, binding.toString());
+  }
+
+  /// For testing only: directly set a binding without persisting to DB.
+  void setBindingForTest(AppAction action, HotkeyBinding binding) {
+    _bindings[action] = binding;
   }
 
   AppAction? findConflict(AppAction forAction, HotkeyBinding binding) {
