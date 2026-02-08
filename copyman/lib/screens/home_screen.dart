@@ -411,6 +411,11 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     try {
       if (Platform.isLinux) {
         await Process.run('xdotool', ['key', 'ctrl+v']);
+      } else if (Platform.isMacOS) {
+        await Process.run('osascript', [
+          '-e',
+          'tell application "System Events" to keystroke "v" using command down',
+        ]);
       }
     } catch (_) {}
   }
@@ -423,6 +428,11 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     try {
       if (Platform.isLinux) {
         await Process.run('xdotool', ['key', 'ctrl+shift+v']);
+      } else if (Platform.isMacOS) {
+        await Process.run('osascript', [
+          '-e',
+          'tell application "System Events" to keystroke "v" using {command down, option down}',
+        ]);
       }
     } catch (_) {}
   }
