@@ -73,7 +73,7 @@ CopyMan is open source and welcomes contributions!
 | Phase | Status | Features |
 |-------|--------|----------|
 | **Phase 2** | ✅ Complete | Keyboard-first UI, configurable shortcuts, groups, sequential paste |
-| **Phase 3** | 📋 Planned | macOS support (native clipboard APIs, system integration) |
+| **Phase 3** | ✅ Complete | macOS support (native clipboard APIs, system integration) |
 | **Phase 4** | 📋 Planned | Windows support (Win32 APIs, system integration) |
 | **Phase 5** | 📋 Future | Cross-device sync (LAN P2P, E2EE), cloud backup, mobile apps |
 
