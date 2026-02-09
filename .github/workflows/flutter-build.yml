@@ -47,3 +47,31 @@ jobs:
         run: |
           test -f copyman/build/linux/x64/release/bundle/copyman || exit 1
           echo "✓ Linux build successful"
+
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.9'
+          channel: 'stable'
+
+      - name: Get dependencies
+        run: |
+          cd copyman
+          flutter pub get
+
+      - name: Build macOS release
+        run: |
+          cd copyman
+          flutter build macos --release
+
+      - name: Verify build artifact
+        run: |
+          test -d copyman/build/macos/Build/Products/Release/copyman.app || exit 1
+          echo "✓ macOS build successful"

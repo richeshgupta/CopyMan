@@ -1,25 +1,47 @@
 import 'dart:io';
 
+typedef ProcessRunner = Future<ProcessResult> Function(
+    String executable, List<String> arguments);
+
 class AppDetectionService {
   /// Get the name of the currently active/foreground window application.
   /// Returns null if unable to detect or on unsupported platform.
-  static Future<String?> getForegroundApp() async {
+  static Future<String?> getForegroundApp({
+    ProcessRunner runner = Process.run,
+  }) async {
     if (Platform.isLinux) {
-      return _getLinuxForegroundApp();
+      return _getLinuxForegroundApp(runner);
     }
-    // Windows/macOS: TODO
+    if (Platform.isMacOS) {
+      return _getMacOSForegroundApp(runner);
+    }
+    // Windows: TODO
     return null;
   }
 
-  static Future<String?> _getLinuxForegroundApp() async {
+  static Future<String?> _getMacOSForegroundApp(ProcessRunner runner) async {
+    try {
+      final result = await runner('osascript', [
+        '-e',
+        'tell application "System Events" to get name of first application process whose frontmost is true',
+      ]);
+      if (result.exitCode != 0) return null;
+      final name = (result.stdout as String).trim();
+      return name.isNotEmpty ? name : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<String?> _getLinuxForegroundApp(ProcessRunner runner) async {
     try {
       // Get the active window ID
-      final widResult = await Process.run('xdotool', ['getactivewindow']);
+      final widResult = await runner('xdotool', ['getactivewindow']);
       if (widResult.exitCode != 0) return null;
       final windowId = (widResult.stdout as String).trim();
 
       // Get the WM_CLASS property
-      final propResult = await Process.run(
+      final propResult = await runner(
         'xprop',
         ['-id', windowId, 'WM_CLASS'],
       );
