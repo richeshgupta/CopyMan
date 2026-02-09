@@ -190,11 +190,21 @@ class StorageService {
   }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
 
-    final existing = await db.query(
-      'clipboard_items',
-      where: 'content = ? AND type = ?',
-      whereArgs: [content, type],
-    );
+    // For images, deduplicate by hash; for text, by content+type.
+    List<Map<String, dynamic>> existing;
+    if (type == 'image' && contentHash != null) {
+      existing = await db.query(
+        'clipboard_items',
+        where: 'content_hash = ? AND type = ?',
+        whereArgs: [contentHash, type],
+      );
+    } else {
+      existing = await db.query(
+        'clipboard_items',
+        where: 'content = ? AND type = ?',
+        whereArgs: [content, type],
+      );
+    }
 
     if (existing.isNotEmpty) {
       final id = existing.first['id'] as int;

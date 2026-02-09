@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -137,6 +139,67 @@ void main() {
       await StorageService.instance.clearExpiredItems();
       final items = await StorageService.instance.fetchItems();
       expect(items.any((i) => i.content == 'old item'), isFalse);
+    });
+  });
+
+  group('StorageService - image deduplication', () {
+    test('inserts image item with bytes and hash', () async {
+      final bytes = Uint8List.fromList([137, 80, 78, 71, 13, 10, 26, 10]); // PNG header
+      final id = await StorageService.instance.insertOrUpdate(
+        '[Image 8 B]',
+        type: 'image',
+        contentBytes: bytes,
+        contentHash: 'abc123hash',
+      );
+      expect(id, greaterThan(0));
+
+      final items = await StorageService.instance.fetchItems();
+      expect(items.length, 1);
+      expect(items.first.type, 'image');
+      expect(items.first.contentBytes, bytes);
+      expect(items.first.contentHash, 'abc123hash');
+    });
+
+    test('deduplicates images by hash, not content text', () async {
+      final bytes = Uint8List.fromList([1, 2, 3]);
+      await StorageService.instance.insertOrUpdate(
+        '[Image 3 B]',
+        type: 'image',
+        contentBytes: bytes,
+        contentHash: 'samehash',
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+      // Same hash, different content text — should deduplicate
+      final id2 = await StorageService.instance.insertOrUpdate(
+        '[Image 3 B] different label',
+        type: 'image',
+        contentBytes: bytes,
+        contentHash: 'samehash',
+      );
+
+      final items = await StorageService.instance.fetchItems();
+      expect(items.length, 1);
+      expect(id2, items.first.id); // bumped, not new
+    });
+
+    test('different hashes create separate items', () async {
+      final bytes1 = Uint8List.fromList([1]);
+      final bytes2 = Uint8List.fromList([2]);
+      await StorageService.instance.insertOrUpdate(
+        '[Image]',
+        type: 'image',
+        contentBytes: bytes1,
+        contentHash: 'hash1',
+      );
+      await StorageService.instance.insertOrUpdate(
+        '[Image]',
+        type: 'image',
+        contentBytes: bytes2,
+        contentHash: 'hash2',
+      );
+
+      final items = await StorageService.instance.fetchItems();
+      expect(items.length, 2);
     });
   });
 }

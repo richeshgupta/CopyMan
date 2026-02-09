@@ -73,6 +73,25 @@ class ClipboardItemTile extends StatelessWidget {
                       color: theme.colorScheme.primary,
                     ),
                   ),
+                // Image thumbnail for image items
+                if (item.type == 'image' && item.contentBytes != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: Image.memory(
+                        item.contentBytes!,
+                        width: 20,
+                        height: 20,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Icon(
+                          Icons.image,
+                          size: 16,
+                          color: theme.colorScheme.secondary,
+                        ),
+                      ),
+                    ),
+                  ),
                 // Content
                 Expanded(
                   child: RichText(

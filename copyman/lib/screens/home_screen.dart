@@ -261,7 +261,9 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '${item.content.length} chars',
+                        item.type == 'image'
+                            ? item.content
+                            : '${item.content.length} chars',
                         style: TextStyle(
                           fontSize: 10,
                           color: theme.colorScheme.secondary,
@@ -279,14 +281,26 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
                   const SizedBox(height: 8),
                   Flexible(
                     child: SingleChildScrollView(
-                      child: Text(
-                        item.content,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: theme.colorScheme.onSurface,
-                          height: 1.4,
-                        ),
-                      ),
+                      child: item.type == 'image' && item.contentBytes != null
+                          ? Image.memory(
+                              item.contentBytes!,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Text(
+                                item.content,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                              ),
+                            )
+                          : Text(
+                              item.content,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: theme.colorScheme.onSurface,
+                                height: 1.4,
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -398,14 +412,22 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   // ── actions ───────────────────────────────────────────────────
 
   Future<void> _copyItem(ClipboardItem item) async {
-    _clipService.setLastContent(item.content);
-    await Clipboard.setData(ClipboardData(text: item.content));
+    if (item.type == 'image' && item.contentBytes != null) {
+      await _copyImageToClipboard(item);
+    } else {
+      _clipService.setLastContent(item.content);
+      await Clipboard.setData(ClipboardData(text: item.content));
+    }
     _hideWindow();
   }
 
   Future<void> _copyAndPaste(ClipboardItem item) async {
-    _clipService.setLastContent(item.content);
-    await Clipboard.setData(ClipboardData(text: item.content));
+    if (item.type == 'image' && item.contentBytes != null) {
+      await _copyImageToClipboard(item);
+    } else {
+      _clipService.setLastContent(item.content);
+      await Clipboard.setData(ClipboardData(text: item.content));
+    }
     await _hideWindow();
     await Future.delayed(const Duration(milliseconds: 80));
     try {
@@ -416,6 +438,33 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
           '-e',
           'tell application "System Events" to keystroke "v" using command down',
         ]);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _copyImageToClipboard(ClipboardItem item) async {
+    if (item.contentBytes == null || item.contentHash == null) return;
+    _clipService.setLastImageHash(item.contentHash!);
+    try {
+      if (Platform.isLinux) {
+        // Write image bytes to xclip via stdin
+        final proc = await Process.start(
+          'xclip',
+          ['-selection', 'clipboard', '-t', 'image/png'],
+        );
+        proc.stdin.add(item.contentBytes!);
+        await proc.stdin.close();
+        await proc.exitCode;
+      }
+      // macOS: write to temp file and use osascript
+      else if (Platform.isMacOS) {
+        final tmpFile = '${Directory.systemTemp.path}/copyman_paste.png';
+        await File(tmpFile).writeAsBytes(item.contentBytes!);
+        await Process.run('osascript', [
+          '-e',
+          'set the clipboard to (read (POSIX file "$tmpFile") as «class PNGf»)',
+        ]);
+        await File(tmpFile).delete();
       }
     } catch (_) {}
   }
