@@ -47,10 +47,64 @@ class ClipboardService {
         }
       } catch (_) {}
 
-      // Try text first
+      // Try image capture FIRST — some apps put both text (file path) and
+      // image data on the clipboard; we prefer the image.
+      final skipImages =
+          await StorageService.instance.getSetting('skip_images');
+      if (skipImages != 'true') {
+        final imageBytes = imageReaderOverride != null
+            ? await imageReaderOverride!()
+            : await _readClipboardImage();
+        if (imageBytes != null && imageBytes.isNotEmpty) {
+          // Check size limit
+          final skipLarge =
+              await StorageService.instance.getSetting('skip_large_images');
+          if (skipLarge == 'true') {
+            final maxStr =
+                await StorageService.instance.getSetting('max_image_size_mb');
+            final maxBytes =
+                ((double.tryParse(maxStr ?? '') ?? 5.0) * 1024 * 1024).round();
+            if (imageBytes.length > maxBytes) return;
+          }
+
+          final hash = sha256.convert(imageBytes).toString();
+          if (hash != _lastImageHash) {
+            _lastImageHash = hash;
+            _lastContent = null; // Image changed, reset text tracking
+            final id = await StorageService.instance.insertOrUpdate(
+              '[Image ${_formatBytes(imageBytes.length)}]',
+              type: 'image',
+              contentBytes: imageBytes,
+              contentHash: hash,
+            );
+            onNewItem.add(id);
+          }
+          return;
+        }
+      }
+
+      // Then try text
       final data = await Clipboard.getData('text/plain');
-      final text = data?.text;
+      final text = data?.text?.trim();
       if (text != null && text.isNotEmpty && text != _lastContent) {
+        // Check if the text is an image file path (e.g. copied from file manager)
+        final imageBytes = await _tryReadImageFromPath(text);
+        if (imageBytes != null && skipImages != 'true') {
+          _lastContent = text;
+          final hash = sha256.convert(imageBytes).toString();
+          if (hash != _lastImageHash) {
+            _lastImageHash = hash;
+            final id = await StorageService.instance.insertOrUpdate(
+              '[Image ${_formatBytes(imageBytes.length)}]',
+              type: 'image',
+              contentBytes: imageBytes,
+              contentHash: hash,
+            );
+            onNewItem.add(id);
+          }
+          return;
+        }
+
         _lastContent = text;
         _lastImageHash = null; // Text changed, reset image tracking
 
@@ -61,41 +115,6 @@ class ClipboardService {
 
         final id = await StorageService.instance.insertOrUpdate(text);
         onNewItem.add(id);
-        return;
-      }
-
-      // Try image capture
-      final skipImages =
-          await StorageService.instance.getSetting('skip_images');
-      if (skipImages == 'true') return;
-
-      final imageBytes = imageReaderOverride != null
-          ? await imageReaderOverride!()
-          : await _readClipboardImage();
-      if (imageBytes != null && imageBytes.isNotEmpty) {
-        // Check size limit
-        final skipLarge =
-            await StorageService.instance.getSetting('skip_large_images');
-        if (skipLarge == 'true') {
-          final maxStr =
-              await StorageService.instance.getSetting('max_image_size_mb');
-          final maxBytes =
-              ((double.tryParse(maxStr ?? '') ?? 5.0) * 1024 * 1024).round();
-          if (imageBytes.length > maxBytes) return;
-        }
-
-        final hash = sha256.convert(imageBytes).toString();
-        if (hash != _lastImageHash) {
-          _lastImageHash = hash;
-          _lastContent = null; // Image changed, reset text tracking
-          final id = await StorageService.instance.insertOrUpdate(
-            '[Image ${_formatBytes(imageBytes.length)}]',
-            type: 'image',
-            contentBytes: imageBytes,
-            contentHash: hash,
-          );
-          onNewItem.add(id);
-        }
       }
     } catch (_) {
       // Clipboard can be empty or contain unsupported data — ignore.
@@ -103,6 +122,36 @@ class ClipboardService {
   }
 
   /// Read image data from the system clipboard using platform tools.
+  /// Image file extensions we recognise.
+  static const _imageExtensions = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.tiff', '.tif'};
+
+  /// If [text] looks like a local image file path (or file:// URI), read it.
+  static Future<Uint8List?> _tryReadImageFromPath(String text) async {
+    try {
+      String path = text;
+      // Handle file:// URIs (from file managers)
+      if (path.startsWith('file://')) {
+        path = Uri.decodeFull(path.replaceFirst('file://', ''));
+      }
+      // Handle multiple URIs (file managers may copy newline-separated list)
+      if (path.contains('\n')) {
+        path = path.split('\n').first.trim();
+        if (path.startsWith('file://')) {
+          path = Uri.decodeFull(path.replaceFirst('file://', ''));
+        }
+      }
+      // Must look like an absolute path to an image file
+      if (!path.startsWith('/')) return null;
+      final ext = path.contains('.') ? '.${path.split('.').last.toLowerCase()}' : '';
+      if (!_imageExtensions.contains(ext)) return null;
+      final file = File(path);
+      if (!await file.exists()) return null;
+      return await file.readAsBytes();
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<Uint8List?> _readClipboardImage() async {
     try {
       if (Platform.isLinux) {

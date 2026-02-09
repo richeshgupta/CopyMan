@@ -413,6 +413,12 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   }
 
   @override
+  void onWindowClose() {
+    // Hide to tray instead of closing
+    _hideWindow();
+  }
+
+  @override
   Future<void> onWindowEvent(String eventName) async {
     if (eventName == 'blur' && !_inSettings) {
       _hideWindow();
