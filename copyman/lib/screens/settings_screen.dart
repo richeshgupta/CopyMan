@@ -39,6 +39,9 @@ class _SettingsScreenState extends State<SettingsScreen>
   final _newAppCtrl = TextEditingController();
   String? _foregroundApp;
   bool _autoExcludeSensitive = false;
+  bool _skipImages = false;
+  bool _skipLargeImages = false;
+  double _maxImageSizeMB = 5.0;
 
   @override
   void initState() {
@@ -62,6 +65,9 @@ class _SettingsScreenState extends State<SettingsScreen>
     final exclusions = await storage.fetchExclusions();
     final fg = await AppDetectionService.getForegroundApp();
     final autoExcl = await storage.getSetting('auto_exclude_sensitive');
+    final skipImg = await storage.getSetting('skip_images');
+    final skipLargeImg = await storage.getSetting('skip_large_images');
+    final maxImgSize = await storage.getSetting('max_image_size_mb');
 
     if (mounted) {
       setState(() {
@@ -71,6 +77,9 @@ class _SettingsScreenState extends State<SettingsScreen>
         _exclusions = exclusions;
         _foregroundApp = fg;
         _autoExcludeSensitive = autoExcl == 'true';
+        _skipImages = skipImg == 'true';
+        _skipLargeImages = skipLargeImg == 'true';
+        _maxImageSizeMB = double.tryParse(maxImgSize ?? '') ?? 5.0;
       });
     }
   }
@@ -218,6 +227,58 @@ class _SettingsScreenState extends State<SettingsScreen>
                 .setSetting('auto_exclude_sensitive', v.toString());
           },
         ),
+        const Divider(height: 1),
+        SwitchListTile(
+          title: const Text('Skip all images'),
+          subtitle: const Text('Do not capture image clipboard content'),
+          value: _skipImages,
+          onChanged: (v) {
+            setState(() => _skipImages = v);
+            StorageService.instance.setSetting('skip_images', v.toString());
+          },
+        ),
+        if (!_skipImages) ...[
+          SwitchListTile(
+            title: const Text('Skip large images'),
+            subtitle: Text(
+                'Skip images larger than ${_maxImageSizeMB.toStringAsFixed(1)} MB'),
+            value: _skipLargeImages,
+            onChanged: (v) {
+              setState(() => _skipLargeImages = v);
+              StorageService.instance
+                  .setSetting('skip_large_images', v.toString());
+            },
+          ),
+          if (_skipLargeImages)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  const Text('Max size:', style: TextStyle(fontSize: 12)),
+                  Expanded(
+                    child: Slider(
+                      value: _maxImageSizeMB,
+                      min: 0.5,
+                      max: 20.0,
+                      divisions: 39,
+                      label: '${_maxImageSizeMB.toStringAsFixed(1)} MB',
+                      onChanged: (v) =>
+                          setState(() => _maxImageSizeMB = v),
+                      onChangeEnd: (v) {
+                        StorageService.instance.setSetting(
+                            'max_image_size_mb', v.toStringAsFixed(1));
+                      },
+                    ),
+                  ),
+                  SizedBox(
+                    width: 48,
+                    child: Text('${_maxImageSizeMB.toStringAsFixed(1)} MB',
+                        style: const TextStyle(fontSize: 11)),
+                  ),
+                ],
+              ),
+            ),
+        ],
         const Divider(height: 1),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),

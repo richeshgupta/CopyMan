@@ -65,10 +65,25 @@ class ClipboardService {
       }
 
       // Try image capture
+      final skipImages =
+          await StorageService.instance.getSetting('skip_images');
+      if (skipImages == 'true') return;
+
       final imageBytes = imageReaderOverride != null
           ? await imageReaderOverride!()
           : await _readClipboardImage();
       if (imageBytes != null && imageBytes.isNotEmpty) {
+        // Check size limit
+        final skipLarge =
+            await StorageService.instance.getSetting('skip_large_images');
+        if (skipLarge == 'true') {
+          final maxStr =
+              await StorageService.instance.getSetting('max_image_size_mb');
+          final maxBytes =
+              ((double.tryParse(maxStr ?? '') ?? 5.0) * 1024 * 1024).round();
+          if (imageBytes.length > maxBytes) return;
+        }
+
         final hash = sha256.convert(imageBytes).toString();
         if (hash != _lastImageHash) {
           _lastImageHash = hash;
