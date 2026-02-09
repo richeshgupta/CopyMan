@@ -15,8 +15,29 @@ class AppDetectionService {
     if (Platform.isMacOS) {
       return _getMacOSForegroundApp(runner);
     }
-    // Windows: TODO
+    if (Platform.isWindows) {
+      return _getWindowsForegroundApp(runner);
+    }
     return null;
+  }
+
+  static Future<String?> _getWindowsForegroundApp(ProcessRunner runner) async {
+    try {
+      final result = await runner('powershell', [
+        '-NoProfile',
+        '-Command',
+        '(Get-Process | Where-Object {\$_.MainWindowHandle -eq '
+            '(Add-Type -MemberDefinition \'[DllImport("user32.dll")] '
+            'public static extern IntPtr GetForegroundWindow();\' '
+            '-Name Win32 -Namespace Temp -PassThru)::GetForegroundWindow()}'
+            ').ProcessName',
+      ]);
+      if (result.exitCode != 0) return null;
+      final name = (result.stdout as String).trim();
+      return name.isNotEmpty ? name : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   static Future<String?> _getMacOSForegroundApp(ProcessRunner runner) async {

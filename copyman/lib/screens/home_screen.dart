@@ -438,6 +438,12 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
           '-e',
           'tell application "System Events" to keystroke "v" using command down',
         ]);
+      } else if (Platform.isWindows) {
+        await Process.run('powershell', [
+          '-NoProfile',
+          '-Command',
+          'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait("^v")',
+        ]);
       }
     } catch (_) {}
   }
@@ -481,6 +487,12 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
         await Process.run('osascript', [
           '-e',
           'tell application "System Events" to keystroke "v" using {command down, option down}',
+        ]);
+      } else if (Platform.isWindows) {
+        await Process.run('powershell', [
+          '-NoProfile',
+          '-Command',
+          'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait("^+v")',
         ]);
       }
     } catch (_) {}
