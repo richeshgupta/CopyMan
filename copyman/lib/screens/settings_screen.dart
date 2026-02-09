@@ -6,6 +6,7 @@ import '../services/app_detection_service.dart';
 import '../services/hotkey_config_service.dart';
 import '../services/hotkey_service.dart';
 import '../services/storage_service.dart';
+import '../widgets/shortcuts_help_overlay.dart';
 
 class SettingsScreen extends StatefulWidget {
   final String currentThemeMode;
@@ -425,15 +426,33 @@ class _SettingsScreenState extends State<SettingsScreen>
         ),
         Padding(
           padding: const EdgeInsets.all(12),
-          child: TextButton(
-            onPressed: () async {
-              await config.resetAllToDefaults();
-              if (widget.hotkeyService != null) {
-                await widget.hotkeyService!.reregister();
-              }
-              setState(() {});
-            },
-            child: const Text('Reset All to Defaults'),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              TextButton(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (_) => Dialog(
+                      child: ShortcutsHelpOverlay(
+                        onClose: () => Navigator.pop(context),
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('View Shortcuts'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  await config.resetAllToDefaults();
+                  if (widget.hotkeyService != null) {
+                    await widget.hotkeyService!.reregister();
+                  }
+                  setState(() {});
+                },
+                child: const Text('Reset All to Defaults'),
+              ),
+            ],
           ),
         ),
       ],

@@ -16,6 +16,7 @@ import '../services/sequence_service.dart';
 import '../services/storage_service.dart';
 import '../widgets/clipboard_item_tile.dart';
 import '../widgets/group_filter_chips.dart';
+import '../widgets/shortcuts_help_overlay.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -57,6 +58,10 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   bool _previewVisible = false;
   OverlayEntry? _previewOverlay;
 
+  // ── shortcuts help overlay ──────────────────────────────────
+  bool _helpVisible = false;
+  OverlayEntry? _helpOverlay;
+
   @override
   void initState() {
     super.initState();
@@ -82,6 +87,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
 
   @override
   void dispose() {
+    _removeHelpOverlay();
     _removePreviewOverlay();
     HardwareKeyboard.instance.removeHandler(_onKey);
     _clipSub?.cancel();
@@ -99,6 +105,16 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   bool _onKey(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
     if (!_searchFocus.hasFocus) return false;
+
+    // Shift+/ (?) toggles shortcuts help overlay
+    if (event.logicalKey == LogicalKeyboardKey.slash &&
+        HardwareKeyboard.instance.isShiftPressed &&
+        !HardwareKeyboard.instance.isControlPressed &&
+        !HardwareKeyboard.instance.isAltPressed &&
+        _searchCtrl.text.isEmpty) {
+      _toggleHelpOverlay();
+      return true;
+    }
 
     // Ctrl+V while in sequence mode: Advance to next item
     if (_config.matches(AppAction.copyAndPaste, event) &&
@@ -320,6 +336,36 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     _previewOverlay = null;
     if (_previewVisible && mounted) {
       setState(() => _previewVisible = false);
+    }
+  }
+
+  // ── shortcuts help overlay ──────────────────────────────────
+
+  void _toggleHelpOverlay() {
+    if (_helpVisible) {
+      _removeHelpOverlay();
+    } else {
+      _showHelpOverlay();
+    }
+  }
+
+  void _showHelpOverlay() {
+    _removeHelpOverlay();
+    final overlay = Overlay.of(context);
+
+    _helpOverlay = OverlayEntry(
+      builder: (_) => ShortcutsHelpOverlay(onClose: _removeHelpOverlay),
+    );
+
+    overlay.insert(_helpOverlay!);
+    setState(() => _helpVisible = true);
+  }
+
+  void _removeHelpOverlay() {
+    _helpOverlay?.remove();
+    _helpOverlay = null;
+    if (_helpVisible && mounted) {
+      setState(() => _helpVisible = false);
     }
   }
 
