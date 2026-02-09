@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 
+import '../utils/sensitive_detector.dart';
 import 'app_detection_service.dart';
 import 'storage_service.dart';
 
@@ -52,6 +53,12 @@ class ClipboardService {
       if (text != null && text.isNotEmpty && text != _lastContent) {
         _lastContent = text;
         _lastImageHash = null; // Text changed, reset image tracking
+
+        // Skip sensitive content if setting is enabled
+        final autoExcl = await StorageService.instance
+            .getSetting('auto_exclude_sensitive');
+        if (autoExcl == 'true' && SensitiveDetector.isSensitive(text)) return;
+
         final id = await StorageService.instance.insertOrUpdate(text);
         onNewItem.add(id);
         return;

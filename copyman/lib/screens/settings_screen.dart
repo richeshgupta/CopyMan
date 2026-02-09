@@ -38,6 +38,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   List<Map<String, dynamic>> _exclusions = [];
   final _newAppCtrl = TextEditingController();
   String? _foregroundApp;
+  bool _autoExcludeSensitive = false;
 
   @override
   void initState() {
@@ -60,6 +61,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     final ttlHours = await storage.getSetting('ttl_hours');
     final exclusions = await storage.fetchExclusions();
     final fg = await AppDetectionService.getForegroundApp();
+    final autoExcl = await storage.getSetting('auto_exclude_sensitive');
 
     if (mounted) {
       setState(() {
@@ -68,6 +70,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         _ttlHours = int.tryParse(ttlHours ?? '') ?? 72;
         _exclusions = exclusions;
         _foregroundApp = fg;
+        _autoExcludeSensitive = autoExcl == 'true';
       });
     }
   }
@@ -205,6 +208,17 @@ class _SettingsScreenState extends State<SettingsScreen>
   Widget _buildExclusionsTab(ThemeData theme) {
     return Column(
       children: [
+        SwitchListTile(
+          title: const Text('Auto-exclude sensitive content'),
+          subtitle: const Text('Skip passwords, API keys, tokens, etc.'),
+          value: _autoExcludeSensitive,
+          onChanged: (v) {
+            setState(() => _autoExcludeSensitive = v);
+            StorageService.instance
+                .setSetting('auto_exclude_sensitive', v.toString());
+          },
+        ),
+        const Divider(height: 1),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: Row(

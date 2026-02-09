@@ -76,4 +76,35 @@ void main() {
       expect(itemWithAge(3 * 86400000).relativeTime, '3d ago');
     });
   });
+
+  group('ClipboardItem.isSensitive', () {
+    test('returns true for text containing secrets', () {
+      final item = ClipboardItem(
+        id: 1,
+        content: 'password: hunter2',
+        createdAt: 0,
+        updatedAt: 0,
+      );
+      expect(item.isSensitive, isTrue);
+    });
+
+    test('returns false for normal text and image items', () {
+      final textItem = ClipboardItem(
+        id: 1,
+        content: 'Hello world',
+        createdAt: 0,
+        updatedAt: 0,
+      );
+      expect(textItem.isSensitive, isFalse);
+
+      final imageItem = ClipboardItem(
+        id: 2,
+        content: 'password: hunter2',
+        type: 'image',
+        createdAt: 0,
+        updatedAt: 0,
+      );
+      expect(imageItem.isSensitive, isFalse);
+    });
+  });
 }

@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import '../utils/sensitive_detector.dart';
+
 class ClipboardItem {
   final int id;
   final String content;
@@ -36,6 +38,9 @@ class ClipboardItem {
       groupId: map['group_id'] as int?,
     );
   }
+
+  bool get isSensitive =>
+      type == 'text' && SensitiveDetector.isSensitive(content);
 
   String get relativeTime {
     final diff = DateTime.now().millisecondsSinceEpoch - updatedAt;

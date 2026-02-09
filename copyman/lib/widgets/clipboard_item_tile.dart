@@ -92,6 +92,16 @@ class ClipboardItemTile extends StatelessWidget {
                       ),
                     ),
                   ),
+                // Sensitive icon
+                if (item.isSensitive)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: Icon(
+                      Icons.lock_outline,
+                      size: 12,
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
                 // Content
                 Expanded(
                   child: RichText(
