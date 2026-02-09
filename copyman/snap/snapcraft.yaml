@@ -1,0 +1,52 @@
+name: copyman
+version: '0.1.0'
+summary: Cross-platform clipboard manager
+description: |
+  CopyMan is a desktop clipboard manager that tracks your clipboard history,
+  supports text and image content, and lets you quickly paste previous items
+  using configurable keyboard shortcuts.
+
+base: core22
+confinement: strict
+grade: stable
+
+apps:
+  copyman:
+    command: copyman
+    desktop: snap/gui/copyman.desktop
+    plugs:
+      - x11
+      - wayland
+      - desktop
+      - desktop-legacy
+      - home
+      - network
+      - process-control
+
+parts:
+  copyman:
+    plugin: nil
+    source: .
+    build-packages:
+      - clang
+      - cmake
+      - ninja-build
+      - pkg-config
+      - libgtk-3-dev
+      - curl
+      - git
+      - unzip
+    stage-packages:
+      - libgtk-3-0
+      - xclip
+      - xdotool
+      - x11-utils
+    override-build: |
+      # Install Flutter if not present
+      if [ ! -d "$HOME/snap/flutter" ] && ! command -v flutter &> /dev/null; then
+        git clone https://github.com/flutter/flutter.git -b stable "$CRAFT_PART_BUILD/flutter-sdk"
+        export PATH="$CRAFT_PART_BUILD/flutter-sdk/bin:$PATH"
+      fi
+      flutter config --no-analytics
+      flutter build linux --release
+      cp -r build/linux/x64/release/bundle/* "$CRAFT_PART_INSTALL/"
