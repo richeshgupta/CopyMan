@@ -4,7 +4,10 @@ A lightweight, fast, and feature-rich clipboard manager for Linux, Windows, and 
 
 **Status:** ✅ Phase 2 Complete | **License:** MIT | **Built with:** Flutter 3.38.9
 
-⚠️ **Current Platform Support:** Linux only. macOS and Windows support coming soon.
+**Platform Support:**
+- ✅ **Linux:** Fully functional (xclip, xdotool, xprop) — Production-ready
+- ⚠️ **macOS:** Image capture via osascript implemented — Needs comprehensive testing
+- 🔄 **Windows:** Code structure ready — Requires platform validation
 
 ---
 
@@ -16,26 +19,28 @@ CopyMan is a smart clipboard manager that captures every text you copy, lets you
 
 | Feature | Description |
 |---------|-------------|
-| **📋 Clipboard History** | Real-time capture (500ms polling) • Auto-cleanup • SQLite storage |
+| **📋 Clipboard History** | Real-time capture (500ms polling) • Text & images • Auto-cleanup • SQLite storage |
 | **🔍 Fuzzy Search** | Instant search • Case-insensitive • Character highlighting |
 | **📁 Groups / Folders** | Organize items • Create/rename/delete groups • Filter by group |
 | **🔄 Sequential Paste** | Multi-select items • Paste multiple items in sequence (Ctrl+V) |
 | **📌 Pin Items** | Keep important snippets at top • Survive auto-cleanup |
-| **🚫 App Exclusions** | Skip password managers & sensitive apps automatically |
+| **🚫 App Exclusions** | Skip password managers & sensitive apps • Sensitive content detection |
 | **📄 Plain Text Paste** | Paste without formatting • Remove styles & links |
 | **🎨 Dark & Light Themes** | Automatic theme switching based on system preference |
 | **🪟 System Tray** | Quick access from system tray • Minimize to tray |
 | **⌨️ Global Hotkey** | Show/hide with Ctrl+Alt+V • Always accessible |
-| **⚙️ Configurable Shortcuts** | Customize all keyboard shortcuts to your preference |
+| **⚙️ Configurable Shortcuts** | Customize all keyboard shortcuts • Conflict detection • Help overlay (Shift+/) |
+| **🖼️ Image Clipboard** | Capture images from clipboard • File path detection • Size limits • Hash-based deduplication |
+| **📦 Distribution** | Snap package • .deb package • Portable binary |
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 - **Flutter 3.38.9+** with Dart 3.10.8+
-- **Linux:** GTK 3.0+, libsqlite3-dev, xdotool, xprop
-- **macOS:** Xcode command-line tools (coming soon)
-- **Windows:** Visual Studio Build Tools or MinGW (coming soon)
+- **Linux:** GTK 3.0+, libsqlite3-dev, xdotool, xprop, xclip
+- **macOS:** Xcode command-line tools, osascript (for image capture)
+- **Windows:** Visual Studio Build Tools or MinGW (code ready, needs testing)
 
 ### Installation
 
@@ -84,11 +89,11 @@ flutter run -d linux
 
 | Phase | Status | Features |
 |-------|--------|----------|
-| **Phase 1** | ✅ Complete | Clipboard history, fuzzy search, pinning, app exclusions, system tray, hotkey, themes |
-| **Phase 2** | ✅ Complete | Groups/folders, sequential paste mode, multi-select, responsive UI, configurable shortcuts |
-| **Phase 3** | 📋 Planned | macOS native support (Cocoa APIs), enhanced performance |
-| **Phase 4** | 📋 Planned | Windows native support (Win32 APIs), system integration |
-| **Phase 5** | 📋 Future | LAN P2P sync, zero-knowledge relay, E2EE, device pairing, image capture |
+| **Phase 1** | ✅ Complete | Clipboard history, fuzzy search, pinning, app exclusions, system tray, hotkey, themes, image capture |
+| **Phase 2** | ✅ Complete | Groups/folders, sequential paste, multi-select, configurable shortcuts, sensitive detection, Snap/.deb packaging |
+| **Phase 3** | ⚠️ Testing | macOS clipboard APIs implemented (osascript for images), comprehensive testing needed |
+| **Phase 4** | 🔄 Testing | Windows app detection and clipboard code ready, requires platform validation |
+| **Phase 5** | 📋 Future | LAN P2P sync, zero-knowledge relay, E2EE, device pairing, mobile apps |
 
 ## 📁 Project Structure
 
@@ -122,7 +127,7 @@ flutter run -d linux
 
 - **UI:** Flutter (Material Design 3) + Dart
 - **Database:** SQLite 3 (sqflite_common_ffi)
-- **Clipboard:** xclip (Linux), native APIs (macOS/Windows - TBD)
+- **Clipboard:** xclip (Linux), osascript (macOS), Flutter Clipboard API (cross-platform text)
 - **Hotkey:** hotkey_manager + HardwareKeyboard
 - **Window:** window_manager
 - **Tray:** tray_manager
@@ -144,10 +149,11 @@ flutter run -d linux
 
 ### Data Models
 
-- **ClipboardItem** — Individual clipboard entry with timestamp, content, groups
-- **Group** — Organization folder with metadata
-- **SequenceSession** — State for sequential paste mode
-- **HotkeyBinding** — Keyboard shortcut configuration
+- **ClipboardItem** — Individual clipboard entry (text/image) with timestamp, hash, content bytes, groups
+- **Group** — Organization folder with name, color, metadata
+- **SequenceSession** — State for sequential paste mode (active items, index)
+- **HotkeyBinding** — Keyboard shortcut configuration (modifiers + key)
+- **AppAction** — Enum of 13 customizable actions
 
 ## 📊 Performance
 
