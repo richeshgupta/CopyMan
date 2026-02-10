@@ -9,10 +9,30 @@ A lightweight, fast, and feature-rich clipboard manager for Linux, Windows, and 
 
 **Status:** ✅ Phase 2 Complete | **License:** MIT | **Built with:** Flutter 3.38.9
 
+[![GitHub release](https://img.shields.io/github/v/release/richeshgupta/CopyMan)](https://github.com/richeshgupta/CopyMan/releases)
+[![GitHub downloads](https://img.shields.io/github/downloads/richeshgupta/CopyMan/total)](https://github.com/richeshgupta/CopyMan/releases)
+[![Tests](https://img.shields.io/badge/tests-177%20passing-brightgreen)](https://github.com/richeshgupta/CopyMan)
+
 **Platform Support:**
 - ✅ **Linux:** Fully functional (production-ready)
 - ⚠️ **macOS:** Core features implemented, needs comprehensive testing
 - 🔄 **Windows:** Code structure ready, requires platform validation
+
+---
+
+## 📥 Quick Install (Linux)
+
+### One-line Installer
+```bash
+curl -sSL https://raw.githubusercontent.com/richeshgupta/CopyMan/master/install.sh | bash
+```
+
+### Or Download .deb Directly
+```bash
+wget https://github.com/richeshgupta/CopyMan/releases/download/v0.1.0/copyman_0.1.0_amd64.deb
+sudo dpkg -i copyman_0.1.0_amd64.deb
+sudo apt-get install -f
+```
 
 ---
 
