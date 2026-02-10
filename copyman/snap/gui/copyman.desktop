@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=CopyMan
+Comment=Cross-platform clipboard manager
+Exec=copyman
+Icon=${SNAP}/meta/gui/copyman.png
+Terminal=false
+Type=Application
+Categories=Utility;

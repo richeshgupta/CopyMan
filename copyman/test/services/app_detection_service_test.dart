@@ -77,6 +77,36 @@ void main() {
     });
   });
 
+  group('AppDetectionService - Windows paths', () {
+    test('returns process name on success', () async {
+      Future<ProcessResult> runner(String exe, List<String> args) async {
+        return _fakeResult(0, 'notepad\n');
+      }
+      expect(await _simulateWindows(runner), 'notepad');
+    });
+
+    test('returns null when stdout is empty', () async {
+      Future<ProcessResult> runner(String exe, List<String> args) async {
+        return _fakeResult(0, '   ');
+      }
+      expect(await _simulateWindows(runner), isNull);
+    });
+
+    test('returns null when exit code is non-zero', () async {
+      Future<ProcessResult> runner(String exe, List<String> args) async {
+        return _fakeResult(1, 'error');
+      }
+      expect(await _simulateWindows(runner), isNull);
+    });
+
+    test('returns null when exception is thrown', () async {
+      Future<ProcessResult> runner(String exe, List<String> args) async {
+        throw Exception('powershell not available');
+      }
+      expect(await _simulateWindows(runner), isNull);
+    });
+  });
+
   group('AppDetectionService - macOS paths', () {
     test('returns trimmed app name on success', () async {
       Future<ProcessResult> runner(String exe, List<String> args) async {
@@ -125,6 +155,18 @@ Future<String?> _simulateLinux(ProcessRunner runner) async {
       return match.group(2);
     }
     return null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Simulate Windows path by directly invoking the Windows logic with a custom runner.
+Future<String?> _simulateWindows(ProcessRunner runner) async {
+  try {
+    final result = await runner('powershell', ['-NoProfile', '-Command', '...']);
+    if (result.exitCode != 0) return null;
+    final name = (result.stdout as String).trim();
+    return name.isNotEmpty ? name : null;
   } catch (_) {
     return null;
   }

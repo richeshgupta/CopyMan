@@ -16,6 +16,7 @@ import '../services/sequence_service.dart';
 import '../services/storage_service.dart';
 import '../widgets/clipboard_item_tile.dart';
 import '../widgets/group_filter_chips.dart';
+import '../widgets/shortcuts_help_overlay.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -57,6 +58,10 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   bool _previewVisible = false;
   OverlayEntry? _previewOverlay;
 
+  // ── shortcuts help overlay ──────────────────────────────────
+  bool _helpVisible = false;
+  OverlayEntry? _helpOverlay;
+
   @override
   void initState() {
     super.initState();
@@ -82,6 +87,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
 
   @override
   void dispose() {
+    _removeHelpOverlay();
     _removePreviewOverlay();
     HardwareKeyboard.instance.removeHandler(_onKey);
     _clipSub?.cancel();
@@ -99,6 +105,16 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   bool _onKey(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
     if (!_searchFocus.hasFocus) return false;
+
+    // Shift+/ (?) toggles shortcuts help overlay
+    if (event.logicalKey == LogicalKeyboardKey.slash &&
+        HardwareKeyboard.instance.isShiftPressed &&
+        !HardwareKeyboard.instance.isControlPressed &&
+        !HardwareKeyboard.instance.isAltPressed &&
+        _searchCtrl.text.isEmpty) {
+      _toggleHelpOverlay();
+      return true;
+    }
 
     // Ctrl+V while in sequence mode: Advance to next item
     if (_config.matches(AppAction.copyAndPaste, event) &&
@@ -261,7 +277,9 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '${item.content.length} chars',
+                        item.type == 'image'
+                            ? item.content
+                            : '${item.content.length} chars',
                         style: TextStyle(
                           fontSize: 10,
                           color: theme.colorScheme.secondary,
@@ -279,14 +297,26 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
                   const SizedBox(height: 8),
                   Flexible(
                     child: SingleChildScrollView(
-                      child: Text(
-                        item.content,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: theme.colorScheme.onSurface,
-                          height: 1.4,
-                        ),
-                      ),
+                      child: item.type == 'image' && item.contentBytes != null
+                          ? Image.memory(
+                              item.contentBytes!,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Text(
+                                item.content,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                              ),
+                            )
+                          : Text(
+                              item.content,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: theme.colorScheme.onSurface,
+                                height: 1.4,
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -306,6 +336,36 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     _previewOverlay = null;
     if (_previewVisible && mounted) {
       setState(() => _previewVisible = false);
+    }
+  }
+
+  // ── shortcuts help overlay ──────────────────────────────────
+
+  void _toggleHelpOverlay() {
+    if (_helpVisible) {
+      _removeHelpOverlay();
+    } else {
+      _showHelpOverlay();
+    }
+  }
+
+  void _showHelpOverlay() {
+    _removeHelpOverlay();
+    final overlay = Overlay.of(context);
+
+    _helpOverlay = OverlayEntry(
+      builder: (_) => ShortcutsHelpOverlay(onClose: _removeHelpOverlay),
+    );
+
+    overlay.insert(_helpOverlay!);
+    setState(() => _helpVisible = true);
+  }
+
+  void _removeHelpOverlay() {
+    _helpOverlay?.remove();
+    _helpOverlay = null;
+    if (_helpVisible && mounted) {
+      setState(() => _helpVisible = false);
     }
   }
 
@@ -350,6 +410,12 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     if (mounted) setState(() => _selectedIndex = 0);
     await windowManager.hide();
     _hiding = false;
+  }
+
+  @override
+  void onWindowClose() {
+    // Hide to tray instead of closing
+    _hideWindow();
   }
 
   @override
@@ -398,14 +464,22 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   // ── actions ───────────────────────────────────────────────────
 
   Future<void> _copyItem(ClipboardItem item) async {
-    _clipService.setLastContent(item.content);
-    await Clipboard.setData(ClipboardData(text: item.content));
+    if (item.type == 'image' && item.contentBytes != null) {
+      await _copyImageToClipboard(item);
+    } else {
+      _clipService.setLastContent(item.content);
+      await Clipboard.setData(ClipboardData(text: item.content));
+    }
     _hideWindow();
   }
 
   Future<void> _copyAndPaste(ClipboardItem item) async {
-    _clipService.setLastContent(item.content);
-    await Clipboard.setData(ClipboardData(text: item.content));
+    if (item.type == 'image' && item.contentBytes != null) {
+      await _copyImageToClipboard(item);
+    } else {
+      _clipService.setLastContent(item.content);
+      await Clipboard.setData(ClipboardData(text: item.content));
+    }
     await _hideWindow();
     await Future.delayed(const Duration(milliseconds: 80));
     try {
@@ -416,6 +490,39 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
           '-e',
           'tell application "System Events" to keystroke "v" using command down',
         ]);
+      } else if (Platform.isWindows) {
+        await Process.run('powershell', [
+          '-NoProfile',
+          '-Command',
+          'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait("^v")',
+        ]);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _copyImageToClipboard(ClipboardItem item) async {
+    if (item.contentBytes == null || item.contentHash == null) return;
+    _clipService.setLastImageHash(item.contentHash!);
+    try {
+      if (Platform.isLinux) {
+        // Write image bytes to xclip via stdin
+        final proc = await Process.start(
+          'xclip',
+          ['-selection', 'clipboard', '-t', 'image/png'],
+        );
+        proc.stdin.add(item.contentBytes!);
+        await proc.stdin.close();
+        await proc.exitCode;
+      }
+      // macOS: write to temp file and use osascript
+      else if (Platform.isMacOS) {
+        final tmpFile = '${Directory.systemTemp.path}/copyman_paste.png';
+        await File(tmpFile).writeAsBytes(item.contentBytes!);
+        await Process.run('osascript', [
+          '-e',
+          'set the clipboard to (read (POSIX file "$tmpFile") as «class PNGf»)',
+        ]);
+        await File(tmpFile).delete();
       }
     } catch (_) {}
   }
@@ -432,6 +539,12 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
         await Process.run('osascript', [
           '-e',
           'tell application "System Events" to keystroke "v" using {command down, option down}',
+        ]);
+      } else if (Platform.isWindows) {
+        await Process.run('powershell', [
+          '-NoProfile',
+          '-Command',
+          'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait("^+v")',
         ]);
       }
     } catch (_) {}

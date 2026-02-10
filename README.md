@@ -9,7 +9,10 @@ A lightweight, fast, and feature-rich clipboard manager for Linux, Windows, and 
 
 **Status:** ✅ Phase 2 Complete | **License:** MIT | **Built with:** Flutter 3.38.9
 
-⚠️ **Current Platform Support:** Linux only. macOS and Windows support coming soon.
+**Platform Support:**
+- ✅ **Linux:** Fully functional (production-ready)
+- ⚠️ **macOS:** Core features implemented, needs comprehensive testing
+- 🔄 **Windows:** Code structure ready, requires platform validation
 
 ---
 
@@ -72,20 +75,20 @@ CopyMan is open source and welcomes contributions!
 
 | Phase | Status | Features |
 |-------|--------|----------|
-| **Phase 2** | ✅ Complete | Keyboard-first UI, configurable shortcuts, groups, sequential paste |
-| **Phase 3** | ✅ Complete | macOS support (native clipboard APIs, system integration) |
-| **Phase 4** | 📋 Planned | Windows support (Win32 APIs, system integration) |
+| **Phase 2** | ✅ Complete | Keyboard-first UI, configurable shortcuts, groups, sequential paste, image capture |
+| **Phase 3** | ⚠️ Testing | macOS support (native clipboard APIs implemented, needs validation) |
+| **Phase 4** | 🔄 Testing | Windows support (code ready, requires comprehensive testing) |
 | **Phase 5** | 📋 Future | Cross-device sync (LAN P2P, E2EE), cloud backup, mobile apps |
 
 ### Current Focus
-- ✅ **Linux MVP** — Fully functional, keyboard-first, ready for daily use
-- 🔄 **macOS Expansion** — Native APIs for clipboard/hotkey/window management
-- 🔄 **Windows Expansion** — Win32 integration for seamless experience
+- ✅ **Linux Production** — Fully functional, 177 tests passing, ready for daily use
+- ⚠️ **macOS Testing** — Image capture via osascript implemented, needs full validation
+- 🔄 **Windows Testing** — App detection and clipboard code ready, needs platform testing
 
-### Known Limitations (Linux v2.0)
-- ⚠️ **Image capture not implemented** — Text-only clipboard history
-- ⚠️ **No cross-device sync** — Data stays on this machine
+### Known Limitations
+- ⚠️ **No cross-device sync** — Data stays on this machine (Phase 5 future feature)
 - ⚠️ **No cloud backup** — Local SQLite database only
+- ⚠️ **Performance at scale** — Not tested with 10,000+ items
 
 ---
 

@@ -7,10 +7,12 @@ typedef VoidCallback = void Function();
 class TrayService with TrayListener {
   final VoidCallback onShow;
   final VoidCallback onExit;
+  final VoidCallback? onSettings;
 
   TrayService({
     required this.onShow,
     required this.onExit,
+    this.onSettings,
   });
 
   Future<void> init() async {
@@ -29,9 +31,7 @@ class TrayService with TrayListener {
         MenuItem.separator(),
         MenuItem(
           label: 'Settings',
-          onClick: (_) {
-            // TODO: Settings dialog in Phase 2
-          },
+          onClick: (_) => onSettings?.call(),
         ),
         MenuItem.separator(),
         MenuItem(

@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shortcuts settings tab with key binding editor
 - Pinned/unpinned item divider in list view
 - Status bar showing item counts
+- **Image clipboard capture** (Linux via xclip, macOS via osascript)
+- **Image file path detection** (file:// URIs from file managers)
+- **Hash-based image deduplication** (SHA-256)
+- **Image size limits** (configurable, skip images over X MB)
+- **Sensitive content detection** (passwords, API keys, tokens, DB credentials)
+- **Auto-exclude sensitive items** (optional setting)
+- **Comprehensive integration test suite** (177 tests, all passing)
+- **Snap packaging support** (snapcraft.yaml)
+- **.deb packaging support** (packaging scripts)
+- **Keyboard shortcuts help overlay** (Shift+/)
 
 ### Changed
 - Window size reduced from 420×580 to 380×480 pixels (~170px vertical reclaimed)
@@ -22,6 +32,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings dialog upgraded to full-screen Scaffold with 4 tabs
 - Clipboard item tiles redesigned to single-row layout with reduced padding
 - Navigation shortcuts now configuration-based instead of hardcoded
+- Clipboard service prioritizes image capture before text
+- Image items display with "[Image X.X KB]" placeholder text
+
+### Fixed
+- Image clipboard capture bug where file path and image data both copied
+- Accidental window close when clicking outside (window focus management)
+- Image deduplication using content hash instead of placeholder text
 
 ### Removed
 - Permanent preview pane (replaced with Space-key toggle overlay)

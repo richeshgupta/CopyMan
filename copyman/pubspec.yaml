@@ -22,6 +22,8 @@ dependencies:
   sqflite_common_ffi: 2.3.7+1
   # App-specific directory paths
   path_provider: ^2.1.0
+  # SHA256 hashing for image deduplication
+  crypto: ^3.0.3
 
 dev_dependencies:
   flutter_test:

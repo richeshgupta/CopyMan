@@ -37,6 +37,8 @@ void main() async {
     () async {
       // Don't show on startup — wait for hotkey (Ctrl+Alt+V)
       await windowManager.hide();
+      // Prevent the X button from killing the app — hide to tray instead
+      await windowManager.setPreventClose(true);
     },
   );
 
