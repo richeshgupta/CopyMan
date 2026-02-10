@@ -20,19 +20,58 @@ A lightweight, fast, and feature-rich clipboard manager for Linux, Windows, and 
 
 ---
 
-## 📥 Quick Install (Linux)
+## 📥 Installation
 
-### One-line Installer
+### Linux (Ubuntu/Debian)
+
+#### Method 1: One-Line Installer (Recommended)
+The easiest way to install CopyMan:
 ```bash
 curl -sSL https://raw.githubusercontent.com/richeshgupta/CopyMan/master/install.sh | bash
 ```
 
-### Or Download .deb Directly
+This will automatically:
+- Download the latest .deb package
+- Install CopyMan and its dependencies
+- Set up the application
+
+#### Method 2: Download .deb Package
 ```bash
 wget https://github.com/richeshgupta/CopyMan/releases/download/v0.1.0/copyman_0.1.0_amd64.deb
 sudo dpkg -i copyman_0.1.0_amd64.deb
-sudo apt-get install -f
+sudo apt-get install -f  # Install dependencies if needed
 ```
+
+#### Method 3: From GitHub Releases
+1. Visit [Releases Page](https://github.com/richeshgupta/CopyMan/releases)
+2. Download `copyman_0.1.0_amd64.deb`
+3. Double-click the file to install (GUI method)
+4. Or use: `sudo dpkg -i copyman_0.1.0_amd64.deb`
+
+### System Requirements
+
+**Linux (Tested on Ubuntu 20.04+):**
+- GTK 3.0+
+- xclip (for image clipboard support)
+- xdotool (for app detection)
+- x11-utils
+
+Dependencies are automatically installed with the .deb package.
+
+### First Launch
+
+After installation:
+1. Press **Ctrl+Alt+V** to open CopyMan
+2. The app will run in the system tray
+3. Copy something to see it in the clipboard history!
+
+### Quick Start
+
+- **Open:** Ctrl+Alt+V
+- **Search:** Just start typing
+- **Copy:** Enter
+- **Copy & Paste:** Ctrl+Enter
+- **Help:** Shift+/ (shows all shortcuts)
 
 ---
 
@@ -58,10 +97,11 @@ sudo apt-get install -f
 
 ---
 
-## 🚀 Quick Start
+## 🛠️ Build from Source
 
-### For Users
+Want to build CopyMan yourself? See our [Development Guide](./docs/DEVELOPMENT.md) for detailed instructions.
 
+**Quick build:**
 ```bash
 cd copyman
 flutter pub get
@@ -69,8 +109,7 @@ flutter build linux --release
 ./build/linux/x64/release/bundle/copyman
 ```
 
-### For Developers
-
+**For developers:**
 ```bash
 cd copyman
 flutter pub get
