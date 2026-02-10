@@ -47,17 +47,19 @@ echo "✅ Created: $DEB_FILE"
 
 echo ""
 echo "📦 Step 2: Building Snap package..."
+SNAP_FILE="copyman_${VERSION}_amd64.snap"
 if command -v snapcraft &> /dev/null; then
     snapcraft clean
     snapcraft
-    SNAP_FILE="copyman_${VERSION}_amd64.snap"
     if [ -f "$SNAP_FILE" ]; then
         echo "✅ Created: $SNAP_FILE"
     else
         echo "⚠️  Snap package not found (non-fatal)"
+        SNAP_FILE=""
     fi
 else
     echo "⚠️  snapcraft not installed, skipping snap build"
+    SNAP_FILE=""
 fi
 
 cd ..
@@ -152,7 +154,7 @@ RELEASE_FILES=""
 if [ -f "copyman/$DEB_FILE" ]; then
     RELEASE_FILES="copyman/$DEB_FILE"
 fi
-if [ -f "copyman/$SNAP_FILE" ]; then
+if [ -n "$SNAP_FILE" ] && [ -f "copyman/$SNAP_FILE" ]; then
     RELEASE_FILES="$RELEASE_FILES copyman/$SNAP_FILE"
 fi
 
