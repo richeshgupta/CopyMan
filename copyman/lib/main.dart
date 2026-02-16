@@ -44,8 +44,9 @@ void main() async {
 
   // Initialize tray service
   _trayService = TrayService(
-    onShow: () {
-      // Callback from tray — trigger window show through HomeScreen
+    onShow: () async {
+      await windowManager.show();
+      await windowManager.focus();
     },
     onExit: () => exit(0),
   );
