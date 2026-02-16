@@ -6,7 +6,7 @@ A lightweight, fast, and feature-rich clipboard manager for Linux, Windows, and 
 
 **Platform Support:**
 - ✅ **Linux:** Fully functional (xclip, xdotool, xprop) — Production-ready
-- ⚠️ **macOS:** Image capture via osascript implemented — Needs comprehensive testing
+- ✅ **macOS:** Supported — Image capture, paste, app detection via osascript, .dmg packaging
 - 🔄 **Windows:** Code structure ready — Requires platform validation
 
 ---
@@ -91,7 +91,7 @@ flutter run -d linux
 |-------|--------|----------|
 | **Phase 1** | ✅ Complete | Clipboard history, fuzzy search, pinning, app exclusions, system tray, hotkey, themes, image capture |
 | **Phase 2** | ✅ Complete | Groups/folders, sequential paste, multi-select, configurable shortcuts, sensitive detection, Snap/.deb packaging |
-| **Phase 3** | ⚠️ Testing | macOS clipboard APIs implemented (osascript for images), comprehensive testing needed |
+| **Phase 3** | ✅ Complete | macOS support (osascript clipboard, entitlements, .dmg packaging) |
 | **Phase 4** | 🔄 Testing | Windows app detection and clipboard code ready, requires platform validation |
 | **Phase 5** | 📋 Future | LAN P2P sync, zero-knowledge relay, E2EE, device pairing, mobile apps |
 

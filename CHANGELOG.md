@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Snap packaging support** (snapcraft.yaml)
 - **.deb packaging support** (packaging scripts)
 - **Keyboard shortcuts help overlay** (Shift+/)
+- **macOS release support** (proper entitlements, Apple Events permissions, .dmg packaging)
+- **macOS DMG packaging script** (`packaging/build_dmg.sh`)
 
 ### Changed
 - Window size reduced from 420×580 to 380×480 pixels (~170px vertical reclaimed)
@@ -34,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Navigation shortcuts now configuration-based instead of hardcoded
 - Clipboard service prioritizes image capture before text
 - Image items display with "[Image X.X KB]" placeholder text
+- macOS bundle identifier updated from placeholder to `com.richeshgupta.copyman`
+- Release script now supports both Linux and macOS builds
 
 ### Fixed
 - Image clipboard capture bug where file path and image data both copied

@@ -14,8 +14,8 @@ A lightweight, fast, and feature-rich clipboard manager for Linux, Windows, and 
 [![Tests](https://img.shields.io/badge/tests-177%20passing-brightgreen)](https://github.com/richeshgupta/CopyMan)
 
 **Platform Support:**
-- ✅ **Linux:** Fully functional (production-ready)
-- ⚠️ **macOS:** Core features implemented, needs comprehensive testing
+- ✅ **Linux:** Production-ready (.deb, Snap)
+- ✅ **macOS:** Supported (.dmg) — clipboard images, paste, app detection via osascript
 - 🔄 **Windows:** Code structure ready, requires platform validation
 
 ---
@@ -48,29 +48,48 @@ sudo apt-get install -f  # Install dependencies if needed
 3. Double-click the file to install (GUI method)
 4. Or use: `sudo dpkg -i copyman_0.1.0_amd64.deb`
 
+### macOS
+
+#### Method 1: Download DMG (Recommended)
+1. Download `copyman_0.1.0_macos.dmg` from the [Releases Page](https://github.com/richeshgupta/CopyMan/releases)
+2. Open the DMG and drag **CopyMan** to **Applications**
+3. On first launch, grant Accessibility permissions when prompted
+
+#### Method 2: Build from Source
+```bash
+cd copyman
+flutter pub get
+flutter build macos --release
+open build/macos/Build/Products/Release/CopyMan.app
+```
+
 ### System Requirements
 
-**Linux (Tested on Ubuntu 20.04+):**
-- GTK 3.0+
-- xclip (for image clipboard support)
-- xdotool (for app detection)
-- x11-utils
+**Linux (Ubuntu 20.04+):**
+- GTK 3.0+, xclip, xdotool, x11-utils
+- Dependencies are automatically installed with the .deb package
 
-Dependencies are automatically installed with the .deb package.
+**macOS (10.14 Mojave+):**
+- No additional dependencies required (uses built-in osascript)
+- Grant Accessibility permissions on first launch for paste simulation
 
 ### First Launch
 
 After installation:
-1. Press **Ctrl+Alt+V** to open CopyMan
-2. The app will run in the system tray
-3. Copy something to see it in the clipboard history!
+
+| | Linux | macOS |
+|---|---|---|
+| **Open CopyMan** | Ctrl+Alt+V | Control+Option+V |
+| **System tray** | System tray icon | Menu bar icon |
+
+Copy something to see it in the clipboard history!
 
 ### Quick Start
 
-- **Open:** Ctrl+Alt+V
+- **Open:** Ctrl+Alt+V (Linux) / Control+Option+V (macOS)
 - **Search:** Just start typing
 - **Copy:** Enter
-- **Copy & Paste:** Ctrl+Enter
+- **Copy & Paste:** Ctrl+Enter / Control+Enter
 - **Help:** Shift+/ (shows all shortcuts)
 
 ---
@@ -135,13 +154,13 @@ CopyMan is open source and welcomes contributions!
 | Phase | Status | Features |
 |-------|--------|----------|
 | **Phase 2** | ✅ Complete | Keyboard-first UI, configurable shortcuts, groups, sequential paste, image capture |
-| **Phase 3** | ⚠️ Testing | macOS support (native clipboard APIs implemented, needs validation) |
+| **Phase 3** | ✅ Complete | macOS support (osascript clipboard, paste, app detection, .dmg packaging) |
 | **Phase 4** | 🔄 Testing | Windows support (code ready, requires comprehensive testing) |
 | **Phase 5** | 📋 Future | Cross-device sync (LAN P2P, E2EE), cloud backup, mobile apps |
 
 ### Current Focus
 - ✅ **Linux Production** — Fully functional, 177 tests passing, ready for daily use
-- ⚠️ **macOS Testing** — Image capture via osascript implemented, needs full validation
+- ✅ **macOS Release** — Image capture, paste, app detection via osascript, .dmg packaging
 - 🔄 **Windows Testing** — App detection and clipboard code ready, needs platform testing
 
 ### Known Limitations
