@@ -79,7 +79,7 @@ We take security seriously. If you discover a security vulnerability in CopyMan,
 - Discuss the vulnerability publicly before it is patched
 
 **Instead:**
-1. Email: [richeshgupta@gmail.com](mailto:richeshgupta@gmail.com)
+1. Email: [rgrichesh45@gmail.com](mailto:rgrichesh45@gmail.com)
 2. Subject line: "CopyMan Security Vulnerability"
 3. Include:
    - Description of the vulnerability
