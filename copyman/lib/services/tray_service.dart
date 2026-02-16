@@ -17,9 +17,8 @@ class TrayService with TrayListener {
 
   Future<void> init() async {
     await trayManager.setIcon(
-      Platform.isLinux
-          ? 'assets/icons/tray_icon.png'
-          : 'assets/icons/tray_icon.png',
+      'assets/icons/tray_icon.png',
+      isTemplate: Platform.isMacOS,
     );
 
     final menu = Menu(
