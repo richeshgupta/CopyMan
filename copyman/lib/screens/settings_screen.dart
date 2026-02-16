@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart' show ConflictAlgorithm;
@@ -565,7 +567,9 @@ class _ShortcutCaptureDialogState extends State<_ShortcutCaptureDialog> {
               setState(() {
                 _captured = HotkeyBinding(
                   key: event.logicalKey,
-                  ctrl: HardwareKeyboard.instance.isControlPressed,
+                  ctrl: Platform.isMacOS
+                      ? HardwareKeyboard.instance.isMetaPressed
+                      : HardwareKeyboard.instance.isControlPressed,
                   shift: HardwareKeyboard.instance.isShiftPressed,
                   alt: HardwareKeyboard.instance.isAltPressed,
                 );

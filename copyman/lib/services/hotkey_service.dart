@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
 
@@ -37,7 +39,7 @@ class HotkeyService {
 
   HotKey _bindingToHotKey(HotkeyBinding binding) {
     final modifiers = <HotKeyModifier>[];
-    if (binding.ctrl) modifiers.add(HotKeyModifier.control);
+    if (binding.ctrl) modifiers.add(Platform.isMacOS ? HotKeyModifier.meta : HotKeyModifier.control);
     if (binding.alt) modifiers.add(HotKeyModifier.alt);
     if (binding.shift) modifiers.add(HotKeyModifier.shift);
 

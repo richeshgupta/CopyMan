@@ -383,7 +383,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   Future<void> _showWindow() async {
     await windowManager.show();
 
-    if (Platform.isLinux) {
+    if (Platform.isLinux || Platform.isMacOS) {
       await windowManager.setAlwaysOnTop(true);
       await Future.delayed(const Duration(milliseconds: 50));
       await windowManager.focus();
@@ -538,7 +538,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
       } else if (Platform.isMacOS) {
         await Process.run('osascript', [
           '-e',
-          'tell application "System Events" to keystroke "v" using {command down, option down}',
+          'tell application "System Events" to keystroke "v" using {command down}',
         ]);
       } else if (Platform.isWindows) {
         await Process.run('powershell', [

@@ -52,7 +52,7 @@ class TrayService with TrayListener {
 
   @override
   void onTrayIconRightMouseDown() {
-    // Context menu handled by trayManager
+    trayManager.popUpContextMenu();
   }
 
   void destroy() {

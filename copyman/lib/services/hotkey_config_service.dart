@@ -36,7 +36,12 @@ class HotkeyBinding {
   bool matches(KeyEvent event) {
     if (event.logicalKey != key) return false;
     final hw = HardwareKeyboard.instance;
-    if (ctrl != hw.isControlPressed) return false;
+    // On macOS, ctrl acts as Command (meta); on Linux/Windows, ctrl is Control
+    if (Platform.isMacOS) {
+      if (ctrl != hw.isMetaPressed) return false;
+    } else {
+      if (ctrl != hw.isControlPressed) return false;
+    }
     if (shift != hw.isShiftPressed) return false;
     if (alt != hw.isAltPressed) return false;
     return true;
