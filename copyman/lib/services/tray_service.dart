@@ -46,8 +46,13 @@ class TrayService with TrayListener {
 
   @override
   void onTrayIconMouseDown() {
-    // Show window on left-click
-    onShow();
+    if (Platform.isMacOS) {
+      // macOS convention: left-click menu bar icon shows the menu
+      trayManager.popUpContextMenu();
+    } else {
+      // Linux: left-click shows the window directly
+      onShow();
+    }
   }
 
   @override
