@@ -49,3 +49,7 @@ app.*.map.json
 
 # Temp files
 flutter_*.png
+
+# Build artifacts
+/copyman-*-linux-x64.tar.gz
+mise.toml

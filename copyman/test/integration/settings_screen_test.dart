@@ -14,6 +14,8 @@ void main() {
 
   setUp(() async {
     await StorageService.instance.deleteAll();
+    // Settings persist across tests in the shared in-memory DB.
+    await StorageService.instance.db.execute('DELETE FROM settings');
   });
 
   tearDownAll(() async {

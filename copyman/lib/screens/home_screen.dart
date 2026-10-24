@@ -9,6 +9,7 @@ import '../models/clipboard_item.dart';
 import '../models/group.dart';
 import '../services/clipboard_service.dart';
 import '../services/fuzzy_search.dart';
+import '../services/linux_clipboard.dart';
 import '../services/group_service.dart';
 import '../services/hotkey_config_service.dart';
 import '../services/hotkey_service.dart';
@@ -62,6 +63,10 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   bool _helpVisible = false;
   OverlayEntry? _helpOverlay;
 
+  // Compositor-bound toggle: `pkill -USR1 -x copyman`. Global key grabs don't
+  // work on Wayland, so a compositor keybind can send this signal instead.
+  StreamSubscription<ProcessSignal>? _toggleSignalSub;
+
   @override
   void initState() {
     super.initState();
@@ -70,6 +75,11 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     _hotkeyService.register().then((ok) {
       if (mounted) setState(() => _hotkeyOk = ok);
     });
+
+    if (Platform.isLinux || Platform.isMacOS) {
+      _toggleSignalSub =
+          ProcessSignal.sigusr1.watch().listen((_) => _toggleWindow());
+    }
 
     windowManager.addListener(this);
 
@@ -93,6 +103,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     _clipSub?.cancel();
     _clipService.dispose();
     _hotkeyService.dispose();
+    _toggleSignalSub?.cancel();
     windowManager.removeListener(this);
     _searchCtrl.dispose();
     _searchFocus.dispose();
@@ -301,7 +312,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
                           ? Image.memory(
                               item.contentBytes!,
                               fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => Text(
+                              errorBuilder: (_, _, _) => Text(
                                 item.content,
                                 style: TextStyle(
                                   fontSize: 12,
@@ -484,7 +495,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     await Future.delayed(const Duration(milliseconds: 80));
     try {
       if (Platform.isLinux) {
-        await Process.run('xdotool', ['key', 'ctrl+v']);
+        await LinuxClipboard.sendPaste();
       } else if (Platform.isMacOS) {
         await Process.run('osascript', [
           '-e',
@@ -534,7 +545,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     await Future.delayed(const Duration(milliseconds: 80));
     try {
       if (Platform.isLinux) {
-        await Process.run('xdotool', ['key', 'ctrl+shift+v']);
+        await LinuxClipboard.sendPaste(shift: true);
       } else if (Platform.isMacOS) {
         await Process.run('osascript', [
           '-e',

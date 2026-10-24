@@ -73,6 +73,16 @@ open build/macos/Build/Products/Release/CopyMan.app
 - No additional dependencies required (uses built-in osascript)
 - Grant Accessibility permissions on first launch for paste simulation
 
+### Wayland (Hyprland, Sway, GNOME)
+
+CopyMan runs under XWayland, where global key grabs don't fire. Bind a key in your compositor to toggle the window with a signal instead:
+
+```bash
+pkill -USR1 -x copyman
+```
+
+Hyprland (Lua config): `o.bind("CTRL + ALT + V", "CopyMan", "pkill -USR1 -x copyman")`, plus a float rule for class `Com.richeshgupta.copyman`. Install `wl-clipboard` (and optionally `wtype`) so copies from native Wayland apps are captured.
+
 ### First Launch
 
 After installation:
