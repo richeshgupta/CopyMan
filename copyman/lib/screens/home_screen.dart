@@ -63,6 +63,10 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   bool _helpVisible = false;
   OverlayEntry? _helpOverlay;
 
+  // Compositor-bound toggle: `pkill -USR1 -x copyman`. Global key grabs don't
+  // work on Wayland, so a compositor keybind can send this signal instead.
+  StreamSubscription<ProcessSignal>? _toggleSignalSub;
+
   @override
   void initState() {
     super.initState();
@@ -71,6 +75,11 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     _hotkeyService.register().then((ok) {
       if (mounted) setState(() => _hotkeyOk = ok);
     });
+
+    if (Platform.isLinux || Platform.isMacOS) {
+      _toggleSignalSub =
+          ProcessSignal.sigusr1.watch().listen((_) => _toggleWindow());
+    }
 
     windowManager.addListener(this);
 
@@ -94,6 +103,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     _clipSub?.cancel();
     _clipService.dispose();
     _hotkeyService.dispose();
+    _toggleSignalSub?.cancel();
     windowManager.removeListener(this);
     _searchCtrl.dispose();
     _searchFocus.dispose();
