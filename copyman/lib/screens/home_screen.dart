@@ -9,6 +9,7 @@ import '../models/clipboard_item.dart';
 import '../models/group.dart';
 import '../services/clipboard_service.dart';
 import '../services/fuzzy_search.dart';
+import '../services/linux_clipboard.dart';
 import '../services/group_service.dart';
 import '../services/hotkey_config_service.dart';
 import '../services/hotkey_service.dart';
@@ -484,7 +485,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     await Future.delayed(const Duration(milliseconds: 80));
     try {
       if (Platform.isLinux) {
-        await Process.run('xdotool', ['key', 'ctrl+v']);
+        await LinuxClipboard.sendPaste();
       } else if (Platform.isMacOS) {
         await Process.run('osascript', [
           '-e',
@@ -534,7 +535,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     await Future.delayed(const Duration(milliseconds: 80));
     try {
       if (Platform.isLinux) {
-        await Process.run('xdotool', ['key', 'ctrl+shift+v']);
+        await LinuxClipboard.sendPaste(shift: true);
       } else if (Platform.isMacOS) {
         await Process.run('osascript', [
           '-e',

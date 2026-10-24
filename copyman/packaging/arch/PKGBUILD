@@ -1,0 +1,36 @@
+# Maintainer: CopyMan Developers
+pkgname=copyman-bin
+_pkgname=copyman
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Cross-platform clipboard manager with history, search and global hotkey'
+arch=('x86_64')
+url='https://github.com/richeshgupta/CopyMan'
+license=('MIT')
+depends=('gtk3' 'libkeybinder3' 'libayatana-appindicator' 'sqlite' 'xclip' 'xdotool'
+         'xorg-xprop' 'xorg-xwininfo' 'wl-clipboard')
+optdepends=('wtype: paste into native Wayland windows')
+provides=("$_pkgname")
+conflicts=("$_pkgname")
+options=('!strip')
+source=("$_pkgname-$pkgver-linux-x64.tar.gz::$url/releases/download/v$pkgver/$_pkgname-$pkgver-linux-x64.tar.gz")
+sha256sums=('808e03d3d8dbd4c4d1a80f155f5600091f7cb6e5b22920682fe298862f791e40')
+
+package() {
+  cd "$srcdir/$_pkgname"
+
+  install -dm755 "$pkgdir/usr/lib/$_pkgname"
+  cp -r --no-preserve=ownership . "$pkgdir/usr/lib/$_pkgname/"
+  rm "$pkgdir/usr/lib/$_pkgname/copyman.desktop" "$pkgdir/usr/lib/$_pkgname/copyman.png" \
+     "$pkgdir/usr/lib/$_pkgname/LICENSE"
+
+  # Native Wayland crashes in libepoxy (no GLX/EGL context), so run under XWayland.
+  install -dm755 "$pkgdir/usr/bin"
+  printf '#!/bin/sh\nGDK_BACKEND=x11 exec /usr/lib/%s/%s "$@"\n' "$_pkgname" "$_pkgname" \
+    > "$pkgdir/usr/bin/$_pkgname"
+  chmod 755 "$pkgdir/usr/bin/$_pkgname"
+
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 copyman.desktop "$pkgdir/usr/share/applications/$_pkgname.desktop"
+  install -Dm644 copyman.png "$pkgdir/usr/share/icons/hicolor/32x32/apps/$_pkgname.png"
+}

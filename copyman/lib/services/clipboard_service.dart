@@ -7,6 +7,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 
 import '../utils/sensitive_detector.dart';
+import 'linux_clipboard.dart';
 import 'app_detection_service.dart';
 import 'storage_service.dart';
 
@@ -84,8 +85,13 @@ class ClipboardService {
       }
 
       // Then try text
-      final data = await Clipboard.getData('text/plain');
-      final text = data?.text?.trim();
+      // On Wayland, fall back to GTK if wl-paste yields nothing.
+      String? raw;
+      if (Platform.isLinux && await LinuxClipboard.isWayland()) {
+        raw = await LinuxClipboard.readText();
+      }
+      raw ??= (await Clipboard.getData('text/plain'))?.text;
+      final text = raw?.trim();
       if (text != null && text.isNotEmpty && text != _lastContent) {
         // Check if the text is an image file path (e.g. copied from file manager)
         final imageBytes = await _tryReadImageFromPath(text);
@@ -164,6 +170,7 @@ class ClipboardService {
   }
 
   static Future<Uint8List?> _readLinuxClipboardImage() async {
+    if (await LinuxClipboard.isWayland()) return LinuxClipboard.readImage();
     // Check if clipboard has image target
     final targets = await Process.run(
       'xclip',
