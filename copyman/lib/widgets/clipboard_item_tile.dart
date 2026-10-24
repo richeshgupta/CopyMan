@@ -84,7 +84,7 @@ class ClipboardItemTile extends StatelessWidget {
                         width: 20,
                         height: 20,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Icon(
+                        errorBuilder: (_, _, _) => Icon(
                           Icons.image,
                           size: 16,
                           color: theme.colorScheme.secondary,

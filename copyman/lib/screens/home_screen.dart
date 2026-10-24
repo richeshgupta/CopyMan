@@ -312,7 +312,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
                           ? Image.memory(
                               item.contentBytes!,
                               fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => Text(
+                              errorBuilder: (_, _, _) => Text(
                                 item.content,
                                 style: TextStyle(
                                   fontSize: 12,
